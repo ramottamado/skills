@@ -1,0 +1,24 @@
+# Scratch notes
+pr.md
+TODO.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+*.swp
+*~
+
+# Claude Code per-user settings
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Node tooling
+node_modules/
+npm-debug.log*
+
+# Secrets
+.env
+.env.*

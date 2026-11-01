@@ -1,0 +1,17 @@
+{
+  "name": "skills",
+  "description": "A compendium of agent skills by ramottamado for day-to-day development.",
+  "version": "0.1.0",
+  "author": {
+    "name": "ramottamado",
+    "email": "tamado@tamado.codes",
+    "url": "https://github.com/ramottamado"
+  },
+  "homepage": "https://github.com/ramottamado/skills",
+  "repository": "https://github.com/ramottamado/skills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "agent-skills"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "ramottamado",
+  "description": "A compendium of agent skills by ramottamado for day-to-day development.",
+  "metadata": {
+    "description": "A compendium of agent skills by ramottamado for day-to-day development."
+  },
+  "owner": {
+    "name": "ramottamado",
+    "email": "tamado@tamado.codes",
+    "url": "https://github.com/ramottamado"
+  },
+  "plugins": [
+    {
+      "name": "skills",
+      "source": "./",
+      "description": "A compendium of agent skills by ramottamado for day-to-day development.",
+      "author": {
+        "name": "ramottamado",
+        "email": "tamado@tamado.codes",
+        "url": "https://github.com/ramottamado"
+      },
+      "homepage": "https://github.com/ramottamado/skills",
+      "repository": "https://github.com/ramottamado/skills",
+      "license": "MIT",
+      "keywords": [
+        "skills",
+        "agent-skills"
+      ]
+    }
+  ]
+}
