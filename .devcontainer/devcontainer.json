@@ -4,15 +4,23 @@
 	"runArgs": [
 		"--name",
 		"skills",
-		"--tmpfs=/tmp:rw,exec,nosuid,nodev,mode=1777"
+		"--tmpfs=/tmp:rw,exec,nosuid,nodev,mode=1777",
+		"--secret=gh_token,type=env,target=GH_TOKEN"
 	],
-	"features": {
-		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+	"containerEnv": {
+		"CLAUDE_CONFIG_DIR": "/home/node/.claude"
 	},
-	"overrideFeatureInstallOrder": [
-		"ghcr.io/anthropics/devcontainer-features/claude-code"
-	],
+	"containerUser": "node",
+	"remoteUser": "node",
+	"features": {
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"installDirectlyFromGitHubRelease": true
+		},
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {}
+	},
 	"mounts": [
-		"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached"
+		"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,consistency=cached"
 	]
 }
