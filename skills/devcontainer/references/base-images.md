@@ -10,7 +10,7 @@ These are the only base images and features the skill generates. Extend this fil
 | Python and Java | `ghcr.io/astral-sh/uv:<uv-version>-python<python-version>-trixie-slim` | java |
 | Java | `mcr.microsoft.com/devcontainers/java:<java-version>-trixie` | java |
 
-Whenever Python is enabled, use the uv image, even if the project doesn't use uv yet. Don't use an MCR Python image, and don't write a Containerfile: the image is used as-is, and the uv settings go in `containerEnv` (see [Python settings](devcontainer-json.md#python-settings)).
+Whenever Python is enabled, use the uv image, even if the project doesn't use uv yet. Don't use an MCR Python image, and don't write a Containerfile: the image is used as-is, and the uv settings go in `containerEnv` (see "Python settings" in [devcontainer-json.md](devcontainer-json.md)).
 
 ## The vscode user
 
@@ -20,7 +20,7 @@ The common-utils feature with `"username": "vscode"` is always added. It creates
 
 Ownership under `/home/vscode`:
 
-- Named volumes mounted under `/home/vscode` use the Podman mount option `chown=true`. Podman then gives the volume to the container user, so `vscode` can write to it. See [Python settings](devcontainer-json.md#python-settings).
+- Named volumes mounted under `/home/vscode` use the Podman mount option `chown=true`. Podman then gives the volume to the container user, so `vscode` can write to it. See "Python settings" in [devcontainer-json.md](devcontainer-json.md).
 - Never put `chown=true` on a bind mount of a host directory. Under rootless Podman it recursively changes the owner of the host's files to a container UID, which can lock the user out of their own `~/.claude` or `~/.config/gh`.
 
 ## Features

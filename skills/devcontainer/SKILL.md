@@ -75,7 +75,7 @@ Check current tags and options upstream instead of trusting memorized values:
 - The detected stack, and whether you inferred it or the user confirmed it.
 - The container name and the source it came from.
 - The base image, user, and features, with the versions you chose and why.
-- The [host prerequisites](references/devcontainer-json.md#host-prerequisites): the `gh_token` Podman secret and the bind-mounted directories. For Python, also say whether a `uv.lock` exists.
+- The host prerequisites (see "Host prerequisites" in [devcontainer-json.md](references/devcontainer-json.md)): the `gh_token` Podman secret and the bind-mounted directories. For Python, also say whether a `uv.lock` exists.
 - Any existing settings you changed or kept, and any validation you could not run.
 
 ## Skill feedback

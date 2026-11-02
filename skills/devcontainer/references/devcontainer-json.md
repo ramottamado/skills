@@ -248,7 +248,7 @@ Every config gets these, whatever the stack:
 
 The volume targets must match `UV_PYTHON_INSTALL_DIR` and `UV_PROJECT_ENVIRONMENT`.
 
-`chown=true` is a Podman mount option. It makes Podman give each named volume to the container user (`vscode`), so `uv sync` can write to it. Use it only on `type=volume` mounts, never on bind mounts of host directories (see [base-images.md](base-images.md#the-vscode-user)).
+`chown=true` is a Podman mount option. It makes Podman give each named volume to the container user (`vscode`), so `uv sync` can write to it. Use it only on `type=volume` mounts, never on bind mounts of host directories (see "The vscode user" in [base-images.md](base-images.md)).
 
 `--locked` fails when `uv.lock` is missing or out of date. If the project has no `uv.lock`, tell the user to create one with `uv lock` (see the `python-dependency-management` skill) before opening the container.
 

@@ -41,7 +41,7 @@ uv prints a derivation chain ("Because A depends on B<2 and C depends on B>=2…
 
 - The lock fails on a platform you don't support: set `[tool.uv] environments = ["sys_platform == 'linux'"]`.
 - A platform needs to be guaranteed wheels: set `required-environments`.
-- Add packages that only one platform needs with a marker (see [commands.md](commands.md#add)).
+- Add packages that only one platform needs with a marker (see "Add" in [commands.md](commands.md)).
 
 ## Private index authentication
 

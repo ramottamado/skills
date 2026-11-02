@@ -17,7 +17,7 @@ docs = ["mkdocs-material>=9.5.49"]
 - Remove: `uv remove --group docs mkdocs-material`.
 - `{include-group = "..."}` nests one group inside another. The included packages must not conflict with the rest of that group.
 - Group entries follow the version rule too: a single `>=<tested version>` floor. `uv add --group` writes that floor.
-- Install: `uv sync --group docs`, `uv sync --all-groups`, `uv sync --only-group lint`, or `uv sync --no-dev`. See [commands.md](commands.md#sync-and-install).
+- Install: `uv sync --group docs`, `uv sync --all-groups`, `uv sync --only-group lint`, or `uv sync --no-dev`. See "Sync and install" in [commands.md](commands.md).
 
 ### Default groups
 

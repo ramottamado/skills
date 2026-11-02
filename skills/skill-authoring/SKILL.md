@@ -19,6 +19,7 @@ Use this skill to add or change skills in this repository so they install cleanl
 - Write the `description` as the trigger. Say what the skill does and when to use it, with concrete signals such as file names, tools, or user phrasing. Say when not to use it, and name the sibling skill that covers that case.
 - Keep the body short and procedural: inspect the project, retrieve the relevant docs, apply the change, validate, and report what changed.
 - Move long or rarely needed detail into `skills/<name>/references/*.md`. Link each file from `SKILL.md` with a relative path, and say when to read it.
+- Link to a local file by its path only, never with a `#anchor`. To point at a section, name it in the text, as in `see "Add" in [commands.md](commands.md)`. Agents and some editors read the anchor as part of the filename, and the link breaks.
 - Prefer links to authoritative upstream documentation over copied API signatures, limits, or configuration that will go stale.
 - Copy [references/skill-feedback.md](references/skill-feedback.md) into the new skill's `references/` folder and replace the skill name in it. Then end `SKILL.md` with a "Skill feedback" section that links to the copy.
 

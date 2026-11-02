@@ -18,7 +18,7 @@ Non-registry sources are recorded in `[tool.uv.sources]`, and the requirement in
 - Git: `uv add git+https://github.com/org/repo --tag v1.2.0` (or `--branch`, `--rev`)
 - Local path: `uv add ../libs/mylib`. Add `--editable` for an editable install.
 - Workspace member: `uv add <member>` from the workspace root writes `{ workspace = true }`.
-- A custom index goes in `[[tool.uv.index]]`, and `uv add <pkg> --index <name>=<url>` pins the package to it. Keep credentials out of the file. See [troubleshooting.md](troubleshooting.md#private-index-authentication).
+- A custom index goes in `[[tool.uv.index]]`, and `uv add <pkg> --index <name>=<url>` pins the package to it. Keep credentials out of the file. See "Private index authentication" in [troubleshooting.md](troubleshooting.md).
 
 Upstream: [Dependency sources](https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-sources), [Package indexes](https://docs.astral.sh/uv/concepts/indexes/).
 

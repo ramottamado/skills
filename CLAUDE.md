@@ -39,6 +39,7 @@ Key points:
 - The frontmatter has only `name` and `description`. `name` must match the directory name (kebab-case).
 - The `description` is the trigger: it decides when an agent loads the skill. State what the skill does and when to use it, including concrete signals such as file names, tools, or user phrasing. Also state when *not* to use it, and name the sibling skill that covers that case.
 - Keep `SKILL.md` lean. Put depth in `references/*.md` and link to it with relative paths so it loads only when needed. Topics with many references can use subfolders, such as `references/<topic>/{README,api,configuration,gotchas,patterns}.md`.
+- Link to a local file by its path only, never with a `#anchor` (write `see "Add" in [commands.md](commands.md)`, not `[commands.md](commands.md#add)`). Agents and some editors read the anchor as part of the filename, and the link breaks.
 - Prefer links to authoritative upstream docs over copies of API signatures, limits, or config that will go stale. Tell the agent to check the project's installed version and docs rather than trust memorized syntax.
 - Each skill's instructions follow this sequence: inspect the project, retrieve the relevant docs, apply the change, validate, and report what changed.
 - A new skill must also get a row in the README's skill table.
