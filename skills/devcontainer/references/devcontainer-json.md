@@ -2,7 +2,9 @@
 
 Replace `<name>` with the normalized project name and the version placeholders with the versions chosen from [base-images.md](base-images.md). The `name` value, the value after `--name`, and the `<name>-venv` volume all use the same string.
 
-Every template carries the [shared settings](#shared-settings). Python-enabled configs add the [Python settings](#python-settings), and Java-enabled configs add the [Java settings](#java-settings). The skill writes only `devcontainer.json`: there is no Containerfile.
+Every template carries the settings in "Shared settings" below. Python-enabled configs add "Python settings", and Java-enabled configs add "Java settings". The skill writes only `devcontainer.json`: there is no Containerfile.
+
+The Python and mixed templates include the optional `postCreateCommand`. Drop it when "Python settings" says to.
 
 ## Python
 
@@ -242,7 +244,7 @@ Every config gets these, whatever the stack:
 | `containerEnv` | `"UV_PYTHON_INSTALL_DIR": "/home/vscode/.uv"` | Puts uv-managed Pythons on the `uv-vol` volume |
 | `mounts` | volume `uv-vol` → `/home/vscode/.uv`, `chown=true` | Python installs, shared by every project |
 | `mounts` | volume `<name>-venv` → `/home/vscode/.venv`, `chown=true` | This project's virtual environment, kept across container rebuilds |
-| `postCreateCommand` | `uv sync --locked --all-groups` | Installs the locked dependencies, including every dependency group |
+| `postCreateCommand` (optional) | `uv sync --locked --all-groups` | Installs the locked dependencies, including every dependency group |
 | VS Code extensions | `ms-toolsai.jupyter`, `ms-ossdata.vscode-pgsql`, `ms-python.python`, `ms-python.vscode-pylance`, `ms-python.autopep8`, `charliermarsh.ruff` | |
 | VS Code settings | `"python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"`, `"python.terminal.activateEnvironment": false` | Uses the uv environment without auto-activating it in terminals |
 
@@ -250,7 +252,21 @@ The volume targets must match `UV_PYTHON_INSTALL_DIR` and `UV_PROJECT_ENVIRONMEN
 
 `chown=true` is a Podman mount option. It makes Podman give each named volume to the container user (`vscode`), so `uv sync` can write to it. Use it only on `type=volume` mounts, never on bind mounts of host directories (see "The vscode user" in [base-images.md](base-images.md)).
 
-`--locked` fails when `uv.lock` is missing or out of date. If the project has no `uv.lock`, tell the user to create one with `uv lock` (see the `python-dependency-management` skill) before opening the container.
+The `postCreateCommand` is optional:
+
+- Add it when the project has a `uv.lock`, unless the user says they'll sync by hand.
+- When there is no `uv.lock`, ask the user whether to add it anyway. Explain that `--locked` makes the command fail, and VS Code shows the error after creating the container, until a `uv.lock` is committed. They can create one with `uv lock` (see the `python-dependency-management` skill). Add the command only if they say yes. Otherwise leave it out.
+- Without it, the venv volume stays empty until someone runs `uv sync`.
+
+If the command fails because `uv.lock` is missing, the container keeps running. VS Code shows the error, and the `<name>-venv` volume stays empty. Fix it from a terminal inside the container, in the workspace folder, then reload the window so the Python extension picks up `/home/vscode/.venv/bin/python`:
+
+| Situation | Run |
+| --- | --- |
+| No `pyproject.toml` (not a uv project yet) | `uv init`, then `uv sync --all-groups` |
+| `pyproject.toml` but no `uv.lock` | `uv lock`, then `uv sync --locked --all-groups` |
+| `uv.lock` exists but is out of date | `uv lock`, then `uv sync --locked --all-groups` |
+
+`uv sync` without `--locked` also creates or updates `uv.lock`, so `uv sync --all-groups` alone works in every case above except a missing `pyproject.toml`. Commit the new `uv.lock` so the next container build syncs cleanly. Dependency changes after that belong to the `python-dependency-management` skill.
 
 ## Java settings
 
@@ -272,7 +288,7 @@ Tell the user about these in the report, because the container fails to start wi
 - If the file uses `build` with a Containerfile or Dockerfile, ask before replacing it with `image`. Move any `ENV` values that the user wants to keep into `containerEnv`.
 - Keep other `runArgs` entries, and make sure exactly one `--name` pair, one `/tmp` tmpfs, and one `gh_token` secret are present.
 - Add the required extensions and settings to any existing `customizations.vscode` without removing the user's own.
-- If a `postCreateCommand` already exists, chain the uv sync into it (`<existing> && uv sync --locked --all-groups`) rather than replacing it.
+- If a `postCreateCommand` already exists and you are adding the uv sync, chain it (`<existing> && uv sync --locked --all-groups`) rather than replacing the command.
 - Keep other `containerEnv` values, mounts, features, and user settings unless they appear on the disallowed list in [base-images.md](base-images.md). Replace a mount that targets the same path with the required one.
 - Match the file's existing indentation and comment style.
 

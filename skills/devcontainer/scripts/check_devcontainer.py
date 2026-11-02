@@ -15,7 +15,8 @@
 6. CLAUDE_CONFIG_DIR and the ~/.claude and ~/.config/gh bind mounts are present. Named
    volumes use chown=true, and bind mounts don't.
 7. Python (uv image): the uv containerEnv values, the uv-vol and <name>-venv volumes,
-   the uv sync postCreateCommand, and the Python VS Code extensions and settings.
+   and the Python VS Code extensions and settings. The uv sync postCreateCommand is
+   optional and not checked.
 8. Java (java feature): installs last, the ~/.m2 and ~/.gradle bind mounts, and the Java
    VS Code extensions.
 9. No Docker-only features, docker.sock mounts, or Compose configuration.
@@ -67,7 +68,6 @@ PYTHON_VOLUMES = {
     "uv-vol": f"/home/{USER}/.uv",
     "{name}-venv": f"/home/{USER}/.venv",
 }
-PYTHON_POST_CREATE = "uv sync --locked --all-groups"
 PYTHON_EXTENSIONS = (
     "ms-toolsai.jupyter",
     "ms-ossdata.vscode-pgsql",
@@ -145,17 +145,6 @@ def parse_mount(mount):
 
 def find_feature(config, prefix):
     return next((v for k, v in config.get("features", {}).items() if k.startswith(prefix)), None)
-
-
-def commands(value):
-    """postCreateCommand is a string, an argv list, or an object of either."""
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, list):
-        return [" ".join(value)]
-    if isinstance(value, dict):
-        return [c for v in value.values() for c in commands(v)]
-    return []
 
 
 def check_mounts(config, required, errors):
@@ -272,8 +261,6 @@ def main():
     if python:
         check_env(config, PYTHON_ENV, errors)
         check_mounts(config, {s.format(name=name): t for s, t in PYTHON_VOLUMES.items()}, errors)
-        if not any(PYTHON_POST_CREATE in c for c in commands(config.get("postCreateCommand"))):
-            errors.append(f'"postCreateCommand" must run {PYTHON_POST_CREATE!r}')
         check_vscode(config, PYTHON_EXTENSIONS, PYTHON_SETTINGS, errors)
 
     if java:

@@ -22,3 +22,7 @@ npm-debug.log*
 # Secrets
 .env
 .env.*
+
+# Python
+__pycache__/
+*.py[cod]

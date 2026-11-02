@@ -1,6 +1,6 @@
 ---
 name: devcontainer
-description: Create or update a VS Code Dev Containers configuration (.devcontainer/devcontainer.json) for Python, Java, or mixed Python and Java projects that run under Podman. Names the container after the project, puts a matching --name in runArgs, always declares containerUser and remoteUser as vscode (created by the common-utils feature), uses the uv image for Python and the MCR Java image for Java-only projects, and adds the required features, env, mounts, secrets, VS Code extensions, and settings. Python projects also get uv sync. Use when the user asks for a dev container, a devcontainer.json, a .devcontainer folder, or VS Code Dev Containers setup ("Reopen in Container"), and the project has signals such as pyproject.toml, requirements.txt, pom.xml, build.gradle, or settings.gradle. Not for GitHub Codespaces, the JetBrains or other non-VS Code clients, Docker or Docker Compose based devcontainers, Containerfile or Dockerfile builds, or other languages (no sibling skill yet), and not for adding Python packages inside the container (use python-dependency-management).
+description: Create or update a VS Code Dev Containers configuration (.devcontainer/devcontainer.json) for Python, Java, or mixed Python and Java projects that run under Podman. Names the container after the project, puts a matching --name in runArgs, always declares containerUser and remoteUser as vscode (created by the common-utils feature), uses the uv image for Python and the MCR Java image for Java-only projects, and adds the required features, env, mounts, secrets, VS Code extensions, and settings. Python projects can also run uv sync on create. Use when the user asks for a dev container, a devcontainer.json, a .devcontainer folder, or VS Code Dev Containers setup ("Reopen in Container"), and the project has signals such as pyproject.toml, requirements.txt, pom.xml, build.gradle, or settings.gradle. Not for GitHub Codespaces, the JetBrains or other non-VS Code clients, Docker or Docker Compose based devcontainers, Containerfile or Dockerfile builds, or other languages (no sibling skill yet), and not for adding Python packages inside the container (use python-dependency-management).
 ---
 
 # Devcontainer
@@ -17,7 +17,7 @@ Every generated file follows these rules:
 - If Python is enabled (alone or with Java):
   - Use the `ghcr.io/astral-sh/uv` image, and set the uv variables in `containerEnv`.
   - Mount the volumes `uv-vol` at `/home/vscode/.uv` and `<name>-venv` at `/home/vscode/.venv`.
-  - Run `uv sync --locked --all-groups` as the `postCreateCommand`.
+  - Optionally run `uv sync --locked --all-groups` as the `postCreateCommand`. Add it when the project has a `uv.lock`, unless the user doesn't want it. When there is no `uv.lock`, ask the user whether to add it anyway.
   - Add the Python VS Code extensions and settings.
 - If Java is enabled:
   - Add the `ghcr.io/devcontainers/features/java:1` feature, and make it install last with `overrideFeatureInstallOrder`.
@@ -75,7 +75,7 @@ Check current tags and options upstream instead of trusting memorized values:
 - The detected stack, and whether you inferred it or the user confirmed it.
 - The container name and the source it came from.
 - The base image, user, and features, with the versions you chose and why.
-- The host prerequisites (see "Host prerequisites" in [devcontainer-json.md](references/devcontainer-json.md)): the `gh_token` Podman secret and the bind-mounted directories. For Python, also say whether a `uv.lock` exists.
+- The host prerequisites (see "Host prerequisites" in [devcontainer-json.md](references/devcontainer-json.md)): the `gh_token` Podman secret and the bind-mounted directories. For Python, also say whether a `uv.lock` exists and whether you added the uv sync `postCreateCommand`. If you added it without a `uv.lock`, give the manual fix (`uv init`, `uv lock`, or `uv sync`) from "Python settings" in [devcontainer-json.md](references/devcontainer-json.md).
 - Any existing settings you changed or kept, and any validation you could not run.
 
 ## Skill feedback
