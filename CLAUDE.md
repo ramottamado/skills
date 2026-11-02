@@ -24,6 +24,7 @@ skills/
   <skill-name>/
     SKILL.md         # required; YAML frontmatter + instructions
     references/      # optional; detail files that SKILL.md links to and loads on demand
+    scripts/         # optional; helper scripts the skill runs (Python scripts use PEP 723 metadata, run with `uv run --script`)
 README.md            # lists every skill and gives the install commands for each agent
 CONTRIBUTING.md
 ```
