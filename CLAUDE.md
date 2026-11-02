@@ -11,7 +11,9 @@ A compendium of agent skills written in-house for future development work. The r
 
 The layout follows [cloudflare/skills](https://github.com/cloudflare/skills). Use that repo as the reference when deciding where something goes.
 
-There is no build, lint, or test tooling. The development environment is `.devcontainer/`, a Node 24 image with Claude Code installed. When you add tooling, document its commands here.
+There is no build, lint, or test tooling. The development environment is `.devcontainer/`, a Python 3.13 uv image (user `vscode`) with Node LTS, Claude Code, and the Dev Container CLI (`devcontainer`) installed. When you add tooling, document its commands here.
+
+Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv run --script <path>`. For example, `uv run --script skills/devcontainer/scripts/check_devcontainer.py .` checks this repo's own `.devcontainer/devcontainer.json`. Inside the container, `devcontainer read-configuration --workspace-folder .` confirms the file parses, but `devcontainer up` needs Podman on the host.
 
 ## Structure
 

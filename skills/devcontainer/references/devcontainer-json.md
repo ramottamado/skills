@@ -4,7 +4,9 @@ Replace `<name>` with the normalized project name and the version placeholders w
 
 Every template carries the settings in "Shared settings" below. Python-enabled configs add "Python settings", and Java-enabled configs add "Java settings". The skill writes only `devcontainer.json`: there is no Containerfile.
 
-The Python and mixed templates include the optional `postCreateCommand`. Drop it when "Python settings" says to.
+The Python and mixed templates include the optional `postCreateCommand` and the optional Python `extensions` and `settings`. Drop them when "Python settings" says to.
+
+Every template sets `overrideFeatureInstallOrder`: common-utils, node, and claude-code install first, in that order, then git, github-cli, and vscode-extensions-cache, with java (when enabled) last.
 
 ## Python
 
@@ -40,9 +42,19 @@ The Python and mixed templates include the optional `postCreateCommand`. Drop it
 			"version": "lts"
 		},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"installDirectlyFromGitHubRelease": true
+		},
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {}
 	},
+	"overrideFeatureInstallOrder": [
+		"ghcr.io/devcontainers/features/common-utils",
+		"ghcr.io/devcontainers/features/node",
+		"ghcr.io/anthropics/devcontainer-features/claude-code",
+		"ghcr.io/devcontainers/features/git",
+		"ghcr.io/devcontainers/features/github-cli",
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache"
+	],
 	"mounts": [
 		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
 		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
@@ -101,7 +113,9 @@ Leave out `installMaven` / `installGradle` when a wrapper (`mvnw`, `gradlew`) is
 			"version": "lts"
 		},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"installDirectlyFromGitHubRelease": true
+		},
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {},
 		"ghcr.io/devcontainers/features/java:1": {
 			"version": "<java-version>",
@@ -110,9 +124,9 @@ Leave out `installMaven` / `installGradle` when a wrapper (`mvnw`, `gradlew`) is
 	},
 	"overrideFeatureInstallOrder": [
 		"ghcr.io/devcontainers/features/common-utils",
-		"ghcr.io/devcontainers/features/git",
 		"ghcr.io/devcontainers/features/node",
 		"ghcr.io/anthropics/devcontainer-features/claude-code",
+		"ghcr.io/devcontainers/features/git",
 		"ghcr.io/devcontainers/features/github-cli",
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache",
 		"ghcr.io/devcontainers/features/java"
@@ -173,7 +187,9 @@ The Python template plus the java feature, which installs last through `override
 			"version": "lts"
 		},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"installDirectlyFromGitHubRelease": true
+		},
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {},
 		"ghcr.io/devcontainers/features/java:1": {
 			"version": "<java-version>",
@@ -182,9 +198,9 @@ The Python template plus the java feature, which installs last through `override
 	},
 	"overrideFeatureInstallOrder": [
 		"ghcr.io/devcontainers/features/common-utils",
-		"ghcr.io/devcontainers/features/git",
 		"ghcr.io/devcontainers/features/node",
 		"ghcr.io/anthropics/devcontainer-features/claude-code",
+		"ghcr.io/devcontainers/features/git",
 		"ghcr.io/devcontainers/features/github-cli",
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache",
 		"ghcr.io/devcontainers/features/java"
@@ -245,12 +261,14 @@ Every config gets these, whatever the stack:
 | `mounts` | volume `uv-vol` → `/home/vscode/.uv`, `chown=true` | Python installs, shared by every project |
 | `mounts` | volume `<name>-venv` → `/home/vscode/.venv`, `chown=true` | This project's virtual environment, kept across container rebuilds |
 | `postCreateCommand` (optional) | `uv sync --locked --all-groups` | Installs the locked dependencies, including every dependency group |
-| VS Code extensions | `ms-toolsai.jupyter`, `ms-ossdata.vscode-pgsql`, `ms-python.python`, `ms-python.vscode-pylance`, `ms-python.autopep8`, `charliermarsh.ruff` | |
-| VS Code settings | `"python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"`, `"python.terminal.activateEnvironment": false` | Uses the uv environment without auto-activating it in terminals |
+| VS Code extensions (optional) | `ms-toolsai.jupyter`, `ms-ossdata.vscode-pgsql`, `ms-python.python`, `ms-python.vscode-pylance`, `ms-python.autopep8`, `charliermarsh.ruff` | |
+| VS Code settings (optional) | `"python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"`, `"python.terminal.activateEnvironment": false` | Uses the uv environment without auto-activating it in terminals |
 
 The volume targets must match `UV_PYTHON_INSTALL_DIR` and `UV_PROJECT_ENVIRONMENT`.
 
 `chown=true` is a Podman mount option. It makes Podman give each named volume to the container user (`vscode`), so `uv sync` can write to it. Use it only on `type=volume` mounts, never on bind mounts of host directories (see "The vscode user" in [base-images.md](base-images.md)).
+
+The Python VS Code extensions and settings are optional. Add them by default, and leave them out (together, since the settings configure the Python extension) when the user doesn't want them. In a mixed project, keep the Java extensions. If `customizations.vscode` ends up empty, drop it.
 
 The `postCreateCommand` is optional:
 

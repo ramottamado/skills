@@ -1,6 +1,6 @@
 {
 	"name": "skills",
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+	"image": "ghcr.io/astral-sh/uv:0.13.6-python3.13-trixie-slim",
 	"runArgs": [
 		"--name",
 		"skills",
@@ -8,19 +8,53 @@
 		"--secret=gh_token,type=env,target=GH_TOKEN"
 	],
 	"containerEnv": {
-		"CLAUDE_CONFIG_DIR": "/home/node/.claude"
+		"CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+		"UV_LINK_MODE": "copy",
+		"UV_COMPILE_BYTECODE": "1",
+		"UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
+		"UV_PYTHON_INSTALL_DIR": "/home/vscode/.uv"
 	},
-	"containerUser": "node",
-	"remoteUser": "node",
+	"containerUser": "vscode",
+	"remoteUser": "vscode",
 	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"username": "vscode",
+			"installZsh": true,
+			"upgradePackages": true
+		},
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "os-provided"
+		},
+		"ghcr.io/devcontainers/features/node:2": {
+			"version": "lts"
+		},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
 		"ghcr.io/devcontainers/features/github-cli:1": {
 			"installDirectlyFromGitHubRelease": true
 		},
 		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {}
 	},
+	"overrideFeatureInstallOrder": [
+		"ghcr.io/devcontainers/features/common-utils",
+		"ghcr.io/devcontainers/features/node",
+		"ghcr.io/anthropics/devcontainer-features/claude-code",
+		"ghcr.io/devcontainers/features/git",
+		"ghcr.io/devcontainers/features/github-cli",
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache"
+	],
+	"postCreateCommand": "npm install -g @devcontainers/cli",
 	"mounts": [
-		"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached",
-		"source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,consistency=cached"
-	]
+		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+		"source=uv-vol,target=/home/vscode/.uv,type=volume,chown=true",
+		"source=skills-venv,target=/home/vscode/.venv,type=volume,chown=true"
+	],
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "/home/vscode/.venv/bin/python",
+				"python.terminal.activateEnvironment": false
+			}
+		}
+	}
 }

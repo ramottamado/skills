@@ -12,13 +12,14 @@ Every generated file follows these rules:
 - `name` is the project name, and `runArgs` contains `"--name", "<name>"` with the identical string.
 - `containerUser` and `remoteUser` are both `vscode`. The common-utils feature is always added with `"username": "vscode"`, `"installZsh": true`, and `"upgradePackages": true`. It creates the user and a `/home/vscode` that `vscode` owns.
 - Named volumes use the Podman mount option `chown=true`, so `vscode` owns them. Bind mounts of host directories never use it.
-- Always add the git feature (`os-provided`), the node feature (`lts`), the claude-code feature (which depends on node), the github-cli feature, and the vscode-extensions-cache feature.
+- Always add the git feature (`os-provided`), the node feature (`lts`), the claude-code feature (which depends on node), the github-cli feature (`"installDirectlyFromGitHubRelease": true`), and the vscode-extensions-cache feature.
+- Always set `overrideFeatureInstallOrder` so common-utils, node, and claude-code install first, in that order, followed by git, github-cli, and vscode-extensions-cache (and java last, when enabled).
 - Always add the run arguments `--tmpfs=/tmp:rw,exec,nosuid,nodev,mode=1777` and the `gh_token` Podman secret as `GH_TOKEN`. Set `CLAUDE_CONFIG_DIR` to `/home/vscode/.claude`, and bind-mount the host's `~/.claude` and `~/.config/gh` into `/home/vscode`.
 - If Python is enabled (alone or with Java):
   - Use the `ghcr.io/astral-sh/uv` image, and set the uv variables in `containerEnv`.
   - Mount the volumes `uv-vol` at `/home/vscode/.uv` and `<name>-venv` at `/home/vscode/.venv`.
   - Optionally run `uv sync --locked --all-groups` as the `postCreateCommand`. Add it when the project has a `uv.lock`, unless the user doesn't want it. When there is no `uv.lock`, ask the user whether to add it anyway.
-  - Add the Python VS Code extensions and settings.
+  - Optionally add the Python VS Code extensions and settings. Add them unless the user doesn't want them.
 - If Java is enabled:
   - Add the `ghcr.io/devcontainers/features/java:1` feature, and make it install last with `overrideFeatureInstallOrder`.
   - Bind-mount the host's `~/.m2` and `~/.gradle` into `/home/vscode`.

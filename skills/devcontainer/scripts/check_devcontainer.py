@@ -14,10 +14,11 @@
    features are present with their required options.
 6. CLAUDE_CONFIG_DIR and the ~/.claude and ~/.config/gh bind mounts are present. Named
    volumes use chown=true, and bind mounts don't.
-7. Python (uv image): the uv containerEnv values, the uv-vol and <name>-venv volumes,
-   and the Python VS Code extensions and settings. The uv sync postCreateCommand is
+7. Python (uv image): the uv containerEnv values and the uv-vol and <name>-venv volumes.
+   The uv sync postCreateCommand and the Python VS Code extensions and settings are
    optional and not checked.
-8. Java (java feature): installs last, the ~/.m2 and ~/.gradle bind mounts, and the Java
+8. overrideFeatureInstallOrder starts with common-utils, node, claude-code.
+   Java (java feature): installs last, the ~/.m2 and ~/.gradle bind mounts, and the Java
    VS Code extensions.
 9. No Docker-only features, docker.sock mounts, or Compose configuration.
 
@@ -31,6 +32,11 @@ import sys
 from pathlib import Path
 
 JAVA_IMAGE = re.compile(r"mcr\.microsoft\.com/devcontainers/java:[^:]+-trixie")
+FIRST_FEATURES = (
+    "ghcr.io/devcontainers/features/common-utils",
+    "ghcr.io/devcontainers/features/node",
+    "ghcr.io/anthropics/devcontainer-features/claude-code",
+)
 UV_IMAGE = re.compile(r"ghcr\.io/astral-sh/uv:[^:]+-python[^:]+-trixie-slim")
 USER = "vscode"
 JAVA_FEATURE = "ghcr.io/devcontainers/features/java"
@@ -40,7 +46,7 @@ REQUIRED_FEATURES = {
     "ghcr.io/devcontainers/features/git": {"version": "os-provided"},
     "ghcr.io/devcontainers/features/node": {"version": "lts"},
     "ghcr.io/anthropics/devcontainer-features/claude-code": {},
-    "ghcr.io/devcontainers/features/github-cli": {},
+    "ghcr.io/devcontainers/features/github-cli": {"installDirectlyFromGitHubRelease": True},
     "ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache": {},
 }
 REQUIRED_RUN_ARGS = (
@@ -67,18 +73,6 @@ PYTHON_ENV = {
 PYTHON_VOLUMES = {
     "uv-vol": f"/home/{USER}/.uv",
     "{name}-venv": f"/home/{USER}/.venv",
-}
-PYTHON_EXTENSIONS = (
-    "ms-toolsai.jupyter",
-    "ms-ossdata.vscode-pgsql",
-    "ms-python.python",
-    "ms-python.vscode-pylance",
-    "ms-python.autopep8",
-    "charliermarsh.ruff",
-)
-PYTHON_SETTINGS = {
-    "python.defaultInterpreterPath": f"/home/{USER}/.venv/bin/python",
-    "python.terminal.activateEnvironment": False,
 }
 JAVA_EXTENSIONS = (
     "vscjava.vscode-java-pack",
@@ -185,15 +179,17 @@ def check_vscode(config, extensions, settings, errors):
             errors.append(f'"customizations.vscode.settings" {key} is {actual!r}; set it to {expected!r}')
 
 
-def check_java_last(config, errors):
-    """overrideFeatureInstallOrder must list every other feature, then the java feature last."""
+def check_install_order(config, java, errors):
+    """common-utils, node, claude-code install first in that order; java, if present, last."""
     order = [re.sub(r"[:@][^/]*$", "", f) for f in config.get("overrideFeatureInstallOrder", [])]
-    if not order or order[-1] != JAVA_FEATURE:
+    if order[:len(FIRST_FEATURES)] != list(FIRST_FEATURES):
+        errors.append(f'"overrideFeatureInstallOrder" must start with {list(FIRST_FEATURES)}')
+    if java and order[-1:] != [JAVA_FEATURE]:
         errors.append(f'"overrideFeatureInstallOrder" must end with {JAVA_FEATURE!r} so it installs last')
     for feature in config.get("features", {}):
         base = re.sub(r"[:@][^/]*$", "", feature)
-        if base != JAVA_FEATURE and base not in order:
-            errors.append(f'{base} is not in "overrideFeatureInstallOrder", so it would install after java')
+        if base not in order:
+            errors.append(f'{base} is not in "overrideFeatureInstallOrder"')
 
 
 def main():
@@ -261,10 +257,10 @@ def main():
     if python:
         check_env(config, PYTHON_ENV, errors)
         check_mounts(config, {s.format(name=name): t for s, t in PYTHON_VOLUMES.items()}, errors)
-        check_vscode(config, PYTHON_EXTENSIONS, PYTHON_SETTINGS, errors)
+
+    check_install_order(config, java, errors)
 
     if java:
-        check_java_last(config, errors)
         check_mounts(config, JAVA_MOUNTS, errors)
         check_vscode(config, JAVA_EXTENSIONS, {}, errors)
 

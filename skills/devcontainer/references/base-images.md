@@ -31,13 +31,11 @@ Ownership under `/home/vscode`:
 | `ghcr.io/devcontainers/features/git:1` | Always | `"version": "os-provided"` |
 | `ghcr.io/devcontainers/features/node:2` | Always (claude-code depends on it) | `"version": "lts"` |
 | `ghcr.io/anthropics/devcontainer-features/claude-code:1.0` | Always | None |
-| `ghcr.io/devcontainers/features/github-cli:1` | Always | None |
+| `ghcr.io/devcontainers/features/github-cli:1` | Always | `"installDirectlyFromGitHubRelease": true` |
 | `ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest` | Always | None |
 | `ghcr.io/devcontainers/features/java:1` | Java enabled, including Java only | `"version": "<java-version>"`, plus the build-tool options below |
 
-claude-code needs Node, so the node feature must install first. The claude-code feature declares that ordering itself. If a build fails because `npm` is missing, add `"overrideFeatureInstallOrder"` with the node feature before claude-code.
-
-The java feature always installs last. Whenever Java is enabled, set `"overrideFeatureInstallOrder"` to every feature ID in the config, without its version tag, in this order: common-utils, git, node, claude-code, github-cli, vscode-extensions-cache, any other features, and java last. Features listed there install first and in the given order, so a feature left out of the list would install after java.
+Always set `"overrideFeatureInstallOrder"` to every feature ID in the config, without its version tag, in this order: common-utils, node, claude-code, git, github-cli, vscode-extensions-cache, any other features, and java last when Java is enabled. claude-code needs Node, and common-utils creates the `vscode` user, so they install first. Features listed there install first and in the given order, so a feature left out of the list would install after the listed ones.
 
 ## Choosing versions
 
