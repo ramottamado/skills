@@ -22,7 +22,7 @@ Every generated file follows these rules:
   - Optionally add the Python VS Code extensions and settings. Add them unless the user doesn't want them.
 - If Java is enabled:
   - Add the `ghcr.io/devcontainers/features/java:1` feature, and make it install last with `overrideFeatureInstallOrder`.
-  - Bind-mount the host's `~/.m2` and `~/.gradle` into `/home/vscode`.
+  - Ask the user whether the project uses Maven, Gradle, or both (infer it from the build files when they make it clear). Bind-mount only the matching host directory into `/home/vscode`: `~/.m2` for Maven, `~/.gradle` for Gradle. Podman refuses to start the container if a bind-mount source is missing, so warn the user to create it first.
   - Add the Java VS Code extensions.
   - A Java-only project uses `mcr.microsoft.com/devcontainers/java:<java-version>-trixie`.
 - The exact images and features come from [references/base-images.md](references/base-images.md). The env, mounts, extensions, and settings come from [references/devcontainer-json.md](references/devcontainer-json.md).
@@ -34,7 +34,7 @@ Every generated file follows these rules:
   - Java: `pom.xml`, `mvnw`, `build.gradle(.kts)`, `settings.gradle(.kts)`, `gradlew`, `.java-version`.
 - If neither stack is detected, or the signals are ambiguous (for example a stray `requirements.txt` in a Java repo), ask the user whether the project is Python, Java, or both.
 - Read the version hints: `requires-python` and `.python-version` for Python; `maven.compiler.release` (or `source`/`target`), `java.toolchain.languageVersion`, and `.java-version` for Java.
-- For Java, note the build tool (Maven or Gradle) and whether a wrapper (`mvnw`, `gradlew`) is committed.
+- For Java, note the build tool (Maven, Gradle, or both) and whether a wrapper (`mvnw`, `gradlew`) is committed.
 - If `.devcontainer/devcontainer.json` already exists, read it and update it in place. Keep the user's other settings (extensions, mounts, env, commands). Ask before replacing the base image, removing a `build` section, or removing anything else.
 
 ## Derive the name
@@ -76,7 +76,7 @@ Check current tags and options upstream instead of trusting memorized values:
 - The detected stack, and whether you inferred it or the user confirmed it.
 - The container name and the source it came from.
 - The base image, user, and features, with the versions you chose and why.
-- The host prerequisites (see "Host prerequisites" in [devcontainer-json.md](references/devcontainer-json.md)): the `gh_token` Podman secret and the bind-mounted directories. For Python, also say whether a `uv.lock` exists and whether you added the uv sync `postCreateCommand`. If you added it without a `uv.lock`, give the manual fix (`uv init`, `uv lock`, or `uv sync`) from "Python settings" in [devcontainer-json.md](references/devcontainer-json.md).
+- The host prerequisites (see "Host prerequisites" in [devcontainer-json.md](references/devcontainer-json.md)): the `gh_token` Podman secret and every bind-mounted host directory in the generated file (`~/.claude`, `~/.config/gh`, and `~/.m2` and/or `~/.gradle` for Java). Name each one and give a single `mkdir -p` command for all of them, because Podman fails with `statfs ...: no such file or directory` if any is missing. The checker prints this command as a `note:` line. For Python, also say whether a `uv.lock` exists and whether you added the uv sync `postCreateCommand`. If you added it without a `uv.lock`, give the manual fix (`uv init`, `uv lock`, or `uv sync`) from "Python settings" in [devcontainer-json.md](references/devcontainer-json.md).
 - Any existing settings you changed or kept, and any validation you could not run.
 
 ## Skill feedback

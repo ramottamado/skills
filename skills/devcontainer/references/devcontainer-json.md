@@ -83,6 +83,8 @@ Every template sets `overrideFeatureInstallOrder`: common-utils, node, and claud
 
 ## Java
 
+Ask the user whether the project uses Maven or Gradle. Keep only the matching `~/.m2` or `~/.gradle` bind mount in the templates below (both only if the user uses both), and delete the other line.
+
 Leave out `installMaven` / `installGradle` when a wrapper (`mvnw`, `gradlew`) is committed. Use `installGradle` instead of `installMaven` for Gradle. `overrideFeatureInstallOrder` makes the java feature install last. If you add another feature, put it in the list before java.
 
 ```jsonc
@@ -290,8 +292,8 @@ If the command fails because `uv.lock` is missing, the container keeps running. 
 
 | Setting | Value | Purpose |
 | --- | --- | --- |
-| `mounts` | `${localEnv:HOME}/.m2` → `/home/vscode/.m2` (bind) | Shares the host's Maven repository and settings |
-| `mounts` | `${localEnv:HOME}/.gradle` → `/home/vscode/.gradle` (bind) | Shares the host's Gradle caches, wrapper distributions, and settings |
+| `mounts` | `${localEnv:HOME}/.m2` → `/home/vscode/.m2` (bind), Maven projects | Shares the host's Maven repository and settings |
+| `mounts` | `${localEnv:HOME}/.gradle` → `/home/vscode/.gradle` (bind), Gradle projects | Shares the host's Gradle caches, wrapper distributions, and settings |
 | VS Code extensions | `vscjava.vscode-java-pack`, `vmware.vscode-boot-dev-pack`, `ms-ossdata.vscode-pgsql`, `redhat.vscode-xml`, `redhat.vscode-yaml` | |
 
 ## Host prerequisites
@@ -299,7 +301,7 @@ If the command fails because `uv.lock` is missing, the container keeps running. 
 Tell the user about these in the report, because the container fails to start without them:
 
 - The Podman secret must exist: `printf '%s' "$(gh auth token)" | podman secret create gh_token -`. Check it with `podman secret ls`.
-- The bind-mounted host directories must exist: `mkdir -p ~/.claude ~/.config/gh`, plus `~/.m2` and `~/.gradle` when Java is enabled. Podman creates named volumes on first use.
+- Every bind-mounted host directory must exist: `mkdir -p ~/.claude ~/.config/gh`, plus `~/.m2` for Maven and/or `~/.gradle` for Gradle when Java is enabled. A missing source makes Podman fail with `statfs <path>: no such file or directory`, so tell the user to run `mkdir -p ~/.gradle` (or `~/.m2`) before reopening in the container. Podman creates named volumes on first use.
 
 ## Updating an existing file
 

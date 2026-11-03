@@ -18,8 +18,8 @@
    The uv sync postCreateCommand and the Python VS Code extensions and settings are
    optional and not checked.
 8. overrideFeatureInstallOrder starts with common-utils, node, claude-code.
-   Java (java feature): installs last, the ~/.m2 and ~/.gradle bind mounts, and the Java
-   VS Code extensions.
+   Java (java feature): installs last, a ~/.m2 or ~/.gradle bind mount (or both,
+   matching the build tool), and the Java VS Code extensions.
 9. No Docker-only features, docker.sock mounts, or Compose configuration.
 
 Usage: uv run --script check_devcontainer.py [PROJECT_ROOT_OR_DEVCONTAINER_JSON]
@@ -59,6 +59,7 @@ REQUIRED_MOUNTS = {
     "${localEnv:HOME}/.claude": f"/home/{USER}/.claude",
     "${localEnv:HOME}/.config/gh": f"/home/{USER}/.config/gh",
 }
+# Build tool caches; a Java config needs at least one, matching its build tool.
 JAVA_MOUNTS = {
     "${localEnv:HOME}/.m2": f"/home/{USER}/.m2",
     "${localEnv:HOME}/.gradle": f"/home/{USER}/.gradle",
@@ -261,7 +262,9 @@ def main():
     check_install_order(config, java, errors)
 
     if java:
-        check_mounts(config, JAVA_MOUNTS, errors)
+        mounts = {(m.get("source"), m.get("target")) for m in map(parse_mount, config.get("mounts", []))}
+        if not any(pair in mounts for pair in JAVA_MOUNTS.items()):
+            errors.append('"mounts" needs ~/.m2 (Maven) and/or ~/.gradle (Gradle) bind-mounted into /home/vscode')
         check_vscode(config, JAVA_EXTENSIONS, {}, errors)
 
     for feature in config.get("features", {}):
@@ -277,6 +280,14 @@ def main():
         print(f"error: {error}")
     if errors:
         sys.exit(1)
+    sources = [
+        m["source"]
+        for m in map(parse_mount, config.get("mounts", []))
+        if m.get("type") == "bind" and m.get("source", "").startswith("${localEnv:HOME}/")
+    ]
+    if sources:
+        dirs = " ".join("~/" + s.removeprefix("${localEnv:HOME}/") for s in sources)
+        print(f"note: Podman fails to start the container if a bind-mount source is missing; run: mkdir -p {dirs}")
     print(f"ok: {path} passes the devcontainer rules")
 
 
