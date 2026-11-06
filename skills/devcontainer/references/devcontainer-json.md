@@ -4,7 +4,7 @@ Replace `<name>` with the normalized project name and the version placeholders w
 
 Every template carries the settings in "Shared settings" below. Python-enabled configs add "Python settings", and Java-enabled configs add "Java settings". The skill writes only `devcontainer.json`: there is no Containerfile.
 
-The Python and mixed templates include the optional `postCreateCommand` and the optional Python `extensions` and `settings`. Drop them when "Python settings" says to.
+The Python and mixed templates include the optional `postCreateCommand` and the optional Python `extensions` and `settings`. Drop them when "Python settings" says to. The Java and mixed templates also include the optional Java `extensions`; drop them when "Java settings" says to.
 
 Every template sets `overrideFeatureInstallOrder`: common-utils, node, and claude-code install first, in that order, then git, github-cli, and vscode-extensions-cache, with java (when enabled) last.
 
@@ -83,7 +83,7 @@ Every template sets `overrideFeatureInstallOrder`: common-utils, node, and claud
 
 ## Java
 
-Ask the user whether the project uses Maven or Gradle. Keep only the matching `~/.m2` or `~/.gradle` bind mount in the templates below (both only if the user uses both), and delete the other line.
+Ask the user whether the project uses Maven, Gradle, both, or neither. The `~/.m2` and `~/.gradle` bind mounts are optional. Keep only the matching one in the templates below (both only if the user uses both), and delete both lines when the user uses no build tool or doesn't want the mount.
 
 Leave out `installMaven` / `installGradle` when a wrapper (`mvnw`, `gradlew`) is committed. Use `installGradle` instead of `installMaven` for Gradle. `overrideFeatureInstallOrder` makes the java feature install last. If you add another feature, put it in the list before java.
 
@@ -270,7 +270,7 @@ The volume targets must match `UV_PYTHON_INSTALL_DIR` and `UV_PROJECT_ENVIRONMEN
 
 `chown=true` is a Podman mount option. It makes Podman give each named volume to the container user (`vscode`), so `uv sync` can write to it. Use it only on `type=volume` mounts, never on bind mounts of host directories (see "The vscode user" in [base-images.md](base-images.md)).
 
-The Python VS Code extensions and settings are optional. Add them by default, and leave them out (together, since the settings configure the Python extension) when the user doesn't want them. In a mixed project, keep the Java extensions. If `customizations.vscode` ends up empty, drop it.
+The Python VS Code extensions and settings are optional. Add them by default, and leave them out (together, since the settings configure the Python extension) when the user doesn't want them. In a mixed project, keep the Java extensions unless the user also declines them. If `customizations.vscode` ends up empty, drop it.
 
 The `postCreateCommand` is optional:
 
@@ -292,9 +292,11 @@ If the command fails because `uv.lock` is missing, the container keeps running. 
 
 | Setting | Value | Purpose |
 | --- | --- | --- |
-| `mounts` | `${localEnv:HOME}/.m2` → `/home/vscode/.m2` (bind), Maven projects | Shares the host's Maven repository and settings |
-| `mounts` | `${localEnv:HOME}/.gradle` → `/home/vscode/.gradle` (bind), Gradle projects | Shares the host's Gradle caches, wrapper distributions, and settings |
-| VS Code extensions | `vscjava.vscode-java-pack`, `vmware.vscode-boot-dev-pack`, `ms-ossdata.vscode-pgsql`, `redhat.vscode-xml`, `redhat.vscode-yaml` | |
+| `mounts` (optional) | `${localEnv:HOME}/.m2` → `/home/vscode/.m2` (bind), Maven projects | Shares the host's Maven repository and settings |
+| `mounts` (optional) | `${localEnv:HOME}/.gradle` → `/home/vscode/.gradle` (bind), Gradle projects | Shares the host's Gradle caches, wrapper distributions, and settings |
+| VS Code extensions (optional) | `vscjava.vscode-java-pack`, `vmware.vscode-boot-dev-pack`, `ms-ossdata.vscode-pgsql`, `redhat.vscode-xml`, `redhat.vscode-yaml` | |
+
+The Java VS Code extensions are optional. Add them by default, and leave them out when the user doesn't want them. In a mixed project, keep the Python extensions unless the user also declines them, and keep `ms-ossdata.vscode-pgsql` if either set stays. If `customizations.vscode` ends up empty, drop it.
 
 ## Host prerequisites
 

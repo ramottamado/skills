@@ -18,8 +18,8 @@
    The uv sync postCreateCommand and the Python VS Code extensions and settings are
    optional and not checked.
 8. overrideFeatureInstallOrder starts with common-utils, node, claude-code.
-   Java (java feature): installs last, a ~/.m2 or ~/.gradle bind mount (or both,
-   matching the build tool), and the Java VS Code extensions.
+   Java (java feature): installs last, the ~/.m2 and ~/.gradle bind mounts and
+   the Java VS Code extensions are optional and not checked.
 9. No Docker-only features, docker.sock mounts, or Compose configuration.
 
 Usage: uv run --script check_devcontainer.py [PROJECT_ROOT_OR_DEVCONTAINER_JSON]
@@ -59,11 +59,6 @@ REQUIRED_MOUNTS = {
     "${localEnv:HOME}/.claude": f"/home/{USER}/.claude",
     "${localEnv:HOME}/.config/gh": f"/home/{USER}/.config/gh",
 }
-# Build tool caches; a Java config needs at least one, matching its build tool.
-JAVA_MOUNTS = {
-    "${localEnv:HOME}/.m2": f"/home/{USER}/.m2",
-    "${localEnv:HOME}/.gradle": f"/home/{USER}/.gradle",
-}
 PYTHON_ENV = {
     "UV_LINK_MODE": "copy",
     "UV_COMPILE_BYTECODE": "1",
@@ -75,13 +70,6 @@ PYTHON_VOLUMES = {
     "uv-vol": f"/home/{USER}/.uv",
     "{name}-venv": f"/home/{USER}/.venv",
 }
-JAVA_EXTENSIONS = (
-    "vscjava.vscode-java-pack",
-    "vmware.vscode-boot-dev-pack",
-    "ms-ossdata.vscode-pgsql",
-    "redhat.vscode-xml",
-    "redhat.vscode-yaml",
-)
 DISALLOWED_FEATURES = (
     "ghcr.io/devcontainers/features/docker-in-docker",
     "ghcr.io/devcontainers/features/docker-outside-of-docker",
@@ -168,18 +156,6 @@ def check_env(config, required, errors):
             errors.append(f'"containerEnv" {key} is {actual!r}; set it to {expected!r}')
 
 
-def check_vscode(config, extensions, settings, errors):
-    vscode = config.get("customizations", {}).get("vscode", {})
-    present = {e.lower() for e in vscode.get("extensions", [])}
-    for extension in extensions:
-        if extension.lower() not in present:
-            errors.append(f'"customizations.vscode.extensions" is missing {extension!r}')
-    for key, expected in settings.items():
-        actual = vscode.get("settings", {}).get(key)
-        if actual != expected:
-            errors.append(f'"customizations.vscode.settings" {key} is {actual!r}; set it to {expected!r}')
-
-
 def check_install_order(config, java, errors):
     """common-utils, node, claude-code install first in that order; java, if present, last."""
     order = [re.sub(r"[:@][^/]*$", "", f) for f in config.get("overrideFeatureInstallOrder", [])]
@@ -260,12 +236,6 @@ def main():
         check_mounts(config, {s.format(name=name): t for s, t in PYTHON_VOLUMES.items()}, errors)
 
     check_install_order(config, java, errors)
-
-    if java:
-        mounts = {(m.get("source"), m.get("target")) for m in map(parse_mount, config.get("mounts", []))}
-        if not any(pair in mounts for pair in JAVA_MOUNTS.items()):
-            errors.append('"mounts" needs ~/.m2 (Maven) and/or ~/.gradle (Gradle) bind-mounted into /home/vscode')
-        check_vscode(config, JAVA_EXTENSIONS, {}, errors)
 
     for feature in config.get("features", {}):
         if feature.startswith(DISALLOWED_FEATURES):

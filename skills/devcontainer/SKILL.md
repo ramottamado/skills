@@ -22,8 +22,8 @@ Every generated file follows these rules:
   - Optionally add the Python VS Code extensions and settings. Add them unless the user doesn't want them.
 - If Java is enabled:
   - Add the `ghcr.io/devcontainers/features/java:1` feature, and make it install last with `overrideFeatureInstallOrder`.
-  - Ask the user whether the project uses Maven, Gradle, or both (infer it from the build files when they make it clear). Bind-mount only the matching host directory into `/home/vscode`: `~/.m2` for Maven, `~/.gradle` for Gradle. Podman refuses to start the container if a bind-mount source is missing, so warn the user to create it first.
-  - Add the Java VS Code extensions.
+  - Ask the user whether the project uses Maven, Gradle, both, or neither (infer it from the build files when they make it clear). Optionally bind-mount the matching host directory into `/home/vscode`: `~/.m2` for Maven, `~/.gradle` for Gradle. Add the mount for a Maven or Gradle project, and leave it out when the user doesn't use a build tool or doesn't want it. Podman refuses to start the container if a bind-mount source is missing, so warn the user to create it first.
+  - Optionally add the Java VS Code extensions. Add them unless the user doesn't want them.
   - A Java-only project uses `mcr.microsoft.com/devcontainers/java:<java-version>-trixie`.
 - The exact images and features come from [references/base-images.md](references/base-images.md). The env, mounts, extensions, and settings come from [references/devcontainer-json.md](references/devcontainer-json.md).
 
