@@ -15,6 +15,12 @@ There is no build, lint, or test tooling. The development environment is `.devco
 
 Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv run --script <path>`. For example, `uv run --script skills/devcontainer/scripts/check_devcontainer.py .` checks this repo's own `.devcontainer/devcontainer.json`. Inside the container, `devcontainer read-configuration --workspace-folder .` confirms the file parses, but `devcontainer up` needs Podman on the host.
 
+## Scope and testing rules
+
+- This repo is solely for agent skills. It has no application code of its own, so don't add a Python or Java project (`pyproject.toml`, `pom.xml`, `build.gradle`, sources) to the repo root.
+- Python and Java in the devcontainer exist only to test the skills. Don't treat them as the repo's own stack. Keep `.devcontainer/` minimal, and don't add build-tool mounts or tooling that only a real project would need.
+- Run every test in a temporary scratch project inside the container (for example under the session scratchpad or `mktemp -d`), never in the repo tree. Create fixtures there, point the skill's scripts at that path, and delete it afterwards. Don't commit fixtures, generated rulesets, or tool downloads.
+
 ## Structure
 
 ```

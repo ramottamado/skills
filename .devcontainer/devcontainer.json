@@ -32,7 +32,10 @@
 		"ghcr.io/devcontainers/features/github-cli:1": {
 			"installDirectlyFromGitHubRelease": true
 		},
-		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {}
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {},
+		"ghcr.io/devcontainers/features/java:1": {
+			"version": "21"
+		}
 	},
 	"overrideFeatureInstallOrder": [
 		"ghcr.io/devcontainers/features/common-utils",
@@ -40,7 +43,8 @@
 		"ghcr.io/anthropics/devcontainer-features/claude-code",
 		"ghcr.io/devcontainers/features/git",
 		"ghcr.io/devcontainers/features/github-cli",
-		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache"
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache",
+		"ghcr.io/devcontainers/features/java"
 	],
 	"postCreateCommand": "npm install -g @devcontainers/cli",
 	"mounts": [
