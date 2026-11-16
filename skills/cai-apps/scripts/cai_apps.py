@@ -17,6 +17,9 @@ Run with `uv run --script cai_apps.py ...` (standard library only; plain `python
   cai_apps.py stop my-service
   cai_apps.py run-as my-service 20                 # numeric id of a project machine user
   cai_apps.py create [--dry-run] [--start]      # from the manifest
+  cai_apps.py backup [app ...] [-o FILE]          # create payloads incl. env (secrets in clear), mode 600
+  cai_apps.py restore FILE [app ...] [--dry-run] [--start]   # recreate apps missing from the project
+  cai_apps.py delete my-service [--backup FILE] [--yes] [--dry-run]
 
 The manifest is --manifest, else $CAI_APPS_MANIFEST, else ./deploy/apps.json.
 An app is addressed by subdomain or name.
@@ -36,6 +39,13 @@ import urllib.request
 from pathlib import Path
 
 SECRET_SUFFIXES = ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD")
+# Fields of CreateApplicationRequest (swagger) that an Application also carries, minus `environment`/`project_id`.
+PAYLOAD_FIELDS = (
+    "name", "subdomain", "description", "script", "cpu", "memory", "nvidia_gpu", "kernel",
+    "bypass_authentication", "runtime_identifier", "runtime_addon_identifiers", "run_as", "cdv_app",
+    "accelerator_label_id", "resource_group_id", "resource_profile_id",
+)
+UNSET_IF_FALSY = {"run_as", "accelerator_label_id", "resource_group_id", "resource_profile_id"}
 TRANSITIONAL = {"APPLICATION_UNKNOWN", "APPLICATION_STARTING", "APPLICATION_STOPPING"}
 
 
@@ -244,6 +254,97 @@ def cmd_create(api: Api, args: argparse.Namespace) -> None:
             print(f"{spec['subdomain']}: created, stopped ... {api.wait(app['id'])}")
 
 
+def create_payload(app: dict, project: str) -> dict:
+    """Rebuild the POST body that would recreate `app`. `environment` is an object here, a JSON string in GET."""
+    body = {"project_id": project}
+    for k in PAYLOAD_FIELDS:
+        v = app.get(k)
+        if v is None or (k in UNSET_IF_FALSY and not v):
+            continue
+        body[k] = v
+    body["environment"] = env_of(app)
+    return body
+
+
+def write_backup(api: Api, apps: list[dict], out: Path) -> None:
+    if out.exists():
+        sys.exit(f"{out} already exists; choose another --output (backups are never overwritten).")
+    doc = {
+        "_comment": "Backup of CAI Applications as create payloads. Contains environment values, secrets included "
+        "in clear text: keep it private and out of git.",
+        "domain": api.domain,
+        "project_id": api.project,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "applications": [create_payload(a, api.project) for a in apps],
+    }
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(doc, f, indent=2)
+        f.write("\n")
+    print(f"backed up {len(apps)} application(s) to {out} (mode 600, contains secrets)")
+
+
+def cmd_backup(api: Api, args: argparse.Namespace) -> None:
+    apps = api.apps()
+    chosen = [find_app(apps, i) for i in args.apps] if args.apps else apps
+    if not chosen:
+        sys.exit("No applications to back up.")
+    out = Path(args.output or f"cai-apps-backup-{time.strftime('%Y%m%d-%H%M%S')}.json").expanduser()
+    write_backup(api, chosen, out)
+
+
+def cmd_restore(api: Api, args: argparse.Namespace) -> None:
+    path = Path(args.file).expanduser()
+    if not path.is_file():
+        sys.exit(f"Backup not found: {path}")
+    doc = json.loads(path.read_text())
+    if doc.get("domain") not in (None, api.domain):
+        print(f"note: backup is from {doc['domain']}, this is {api.domain}; run_as and runtime ids may not exist here")
+    specs = doc["applications"]
+    if args.apps:
+        wanted = {a.lower() for a in args.apps}
+        specs = [s for s in specs if wanted & {s["subdomain"].lower(), s["name"].lower()}]
+        unknown = wanted - {x.lower() for s in specs for x in (s["subdomain"], s["name"])}
+        if unknown:
+            sys.exit(f"Not in the backup: {', '.join(sorted(unknown))}")
+    existing = {a["subdomain"] for a in api.apps()}
+    for spec in specs:
+        sub = spec["subdomain"]
+        if sub in existing:
+            print(f"{sub}: exists, skipping (delete it first to restore over it)")
+            continue
+        body = {**spec, "project_id": api.project}
+        if args.dry_run:
+            print(f"{sub}: would create {json.dumps({**body, 'environment': mask(body.get('environment', {}))})}")
+            continue
+        app = api.call("POST", api.apps_path, body)
+        # CAI starts an application the moment it is created. Stop it unless asked otherwise.
+        if args.start:
+            print(f"{sub}: restored ... {api.wait(app['id'])}")
+        else:
+            api.call("POST", f"{api.apps_path}/{app['id']}:stop", {})
+            print(f"{sub}: restored, stopped ... {api.wait(app['id'])}")
+
+
+def cmd_delete(api: Api, args: argparse.Namespace) -> None:
+    app = find_app(api.apps(), args.app)
+    print(f"{app['subdomain']}: {app['status']}, run_as={app.get('run_as', 0)}")
+    if args.dry_run:
+        print("dry run: would delete" + (f" after backing up to {args.backup}" if args.backup else ""))
+        return
+    if args.backup:
+        write_backup(api, [app], Path(args.backup).expanduser())
+    if not args.yes:
+        if not sys.stdin.isatty():
+            sys.exit("Refusing to delete without confirmation: pass --yes, or run from a terminal.")
+        if input(f"Type the subdomain {app['subdomain']!r} to delete it permanently: ").strip() != app["subdomain"]:
+            sys.exit("Subdomain did not match; nothing deleted.")
+    api.call("DELETE", f"{api.apps_path}/{app['id']}")
+    gone = all(a["id"] != app["id"] for a in api.apps())
+    print(f"{app['subdomain']}: deleted" if gone else f"{app['subdomain']}: delete requested, still listed")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -272,6 +373,22 @@ def main() -> None:
     s.add_argument("--dry-run", action="store_true")
     s.add_argument("--start", action="store_true", help="leave them running (default: stop right after creation)")
     s.set_defaults(fn=cmd_create)
+    s = sub.add_parser("backup", help="write apps and env as create payloads to a JSON file (mode 600, secrets in clear)")
+    s.add_argument("apps", nargs="*", help="subdomains or names (default: all)")
+    s.add_argument("-o", "--output", help="file to write (default: cai-apps-backup-<timestamp>.json; never overwritten)")
+    s.set_defaults(fn=cmd_backup)
+    s = sub.add_parser("restore", help="recreate apps from a backup file (existing subdomains are skipped)")
+    s.add_argument("file")
+    s.add_argument("apps", nargs="*", help="subdomains or names to restore (default: all in the file)")
+    s.add_argument("--dry-run", action="store_true")
+    s.add_argument("--start", action="store_true", help="leave them running (default: stop right after creation)")
+    s.set_defaults(fn=cmd_restore)
+    s = sub.add_parser("delete", help="permanently delete an application")
+    s.add_argument("app")
+    s.add_argument("--backup", metavar="FILE", help="back the app up to FILE before deleting")
+    s.add_argument("--yes", action="store_true", help="skip the typed confirmation")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_delete)
     args = p.parse_args()
     args.fn(Api(), args)
 

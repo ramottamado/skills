@@ -19,6 +19,9 @@ uv run --script cai_apps.py restart <app>                         # also starts 
 uv run --script cai_apps.py stop <app>
 uv run --script cai_apps.py run-as <app> <numeric-user-id>
 uv run --script cai_apps.py create [--manifest deploy/apps.json] [--dry-run] [--start]
+uv run --script cai_apps.py backup [app ...] [-o file.json]   # all apps by default
+uv run --script cai_apps.py restore <file.json> [app ...] [--dry-run] [--start]
+uv run --script cai_apps.py delete <app> [--backup file.json] [--yes] [--dry-run]
 ```
 
 An app is addressed by subdomain or name. Variable names ending `_KEY`, `_TOKEN`, `_SECRET`, `_PASSWORD` are treated as secrets and masked.
@@ -34,6 +37,10 @@ For writing the app scripts themselves (port binding, uv, health checks, Kerbero
 3. **Apply:** follow "First deployment" or "Common operations" below. Use `--dry-run` first.
 4. **Validate:** `list` for status, then the checks in "Verifying a deployment".
 5. **Report:** which apps changed, which variables were set or removed (names only, never values), what was restarted, and any step you could not run.
+
+`backup` writes each app as the body `POST` create takes (`project_id`, `name`, `subdomain`, `script`, `cpu`, `memory`, `runtime_identifier`, `run_as`, `environment` as an object, and so on) plus the domain, project and timestamp. **The file contains every environment value, secrets included, in clear text.** It is created with mode 600, never overwrites an existing file, and must stay out of git (add it to `.gitignore`). Do not print or paste its contents. `restore` recreates the apps in a backup that are missing from the project (existing subdomains are skipped, so `delete` one first to restore over it). Like `create`, it stops each app right after creation unless `--start`; run `--dry-run` first (secrets masked). The payload carries `run_as` and `runtime_identifier`, so restoring into another project or deployment can fail if they don't exist there.
+
+`delete` is permanent. It asks you to type the app's subdomain unless `--yes` is passed, and refuses without a terminal. Use `--backup <file>` to save the app first. Confirm with the user before deleting, always back up first, and never pass `--yes` on your own initiative.
 
 ## Facts that cost time to learn
 
@@ -73,6 +80,9 @@ Starting, stopping, restarting, changing run-as, and rotating tokens affect runn
 | Rotate the service token | Create the new key, `set` it on **all** apps, restart all, then revoke the old one. The old token stops working on revoke, so swap quickly. |
 | Remove a setting | `set <app> --unset KEY --restart` |
 | Stop everything | `stop` each app, UI first |
+| Save before a risky change | `backup -o <file>` (secrets in clear, mode 600) |
+| Recreate from a backup | `restore <file> --dry-run`, then `restore <file>` |
+| Remove an app | `delete <app> --backup <file>` after the user agrees |
 | Preview any change | `set ... --dry-run`, `create --dry-run` |
 
 ## Verifying a deployment
