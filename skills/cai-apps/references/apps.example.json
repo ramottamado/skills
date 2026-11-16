@@ -1,0 +1,31 @@
+{
+  "_comment": "Non-secret definition of the Applications. ${VAR} / ${VAR:-default} are filled from the local environment when `cai_apps.py create` runs; unset ones without a default abort the run. Never put secrets here: set them afterwards with `cai_apps.py set <app> KEY=@/path/to/file`.",
+  "runtime_match": "pbj-workbench-python3.12-standard",
+  "apps": [
+    {
+      "name": "My Service",
+      "subdomain": "my-service",
+      "script": "scripts/cai/app_service.py",
+      "cpu": 1,
+      "memory": 2,
+      "description": "Backend service",
+      "env": {
+        "UPSTREAM_URL": "${UPSTREAM_URL}",
+        "LOG_LEVEL": "${LOG_LEVEL:-info}",
+        "CDSW_APP_POLLING_ENDPOINT": "/health"
+      }
+    },
+    {
+      "name": "My UI",
+      "subdomain": "my-ui",
+      "script": "scripts/cai/app_ui.py",
+      "cpu": 0.5,
+      "memory": 1,
+      "description": "Web UI for end users",
+      "env": {
+        "SERVICE_SUBDOMAIN": "my-service",
+        "CDSW_APP_POLLING_ENDPOINT": "/health"
+      }
+    }
+  ]
+}
