@@ -27,7 +27,8 @@ Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv 
 .claude-plugin/
   marketplace.json   # marketplace catalog; lists plugins, one entry with "source": "./"
   plugin.json        # Claude Code plugin manifest (name, version, description, author, license, keywords)
-plugin.json          # agent-agnostic manifest ($schema: agent-plugins.org plugin schema), same metadata
+.antigravity-plugin/
+  plugin.json        # Antigravity manifest (same metadata plus displayName)
 skills/
   <skill-name>/
     SKILL.md         # required; YAML frontmatter + instructions
@@ -39,7 +40,7 @@ CONTRIBUTING.md
 
 Key points:
 - **The repo root is the plugin.** `marketplace.json` points at `./`, and Claude Code discovers skills automatically from `skills/*/SKILL.md`. Nothing has to register each skill. `npx skills` reads the same `skills/` directory, which is why one tree serves both install paths.
-- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and the root `plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release.
+- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release. `agy plugin validate .` checks the Antigravity manifest; The logo is `assets/icon.png` (512 px PNG), referenced by `icon` in the Claude manifest and `logo` in the Antigravity one.
 - Manifests for other agents are optional additions; cloudflare/skills ships one each for `.codex-plugin/`, `.cursor-plugin/`, `.agents/plugins/`, and `.antigravity-plugin/`. If you add any, they mirror the same metadata.
 
 ## Skill authoring conventions
@@ -56,5 +57,5 @@ Key points:
 
 ## Validating changes
 
-- `claude plugin validate .` checks the marketplace and plugin manifests. It currently passes with two warnings that you can ignore. One says this CLAUDE.md isn't loaded as plugin context, which is intended because it's for working on the repo. The other says there is no plugin icon (a square PNG of 512–2048 px), which only matters for a plugin directory listing.
+- `claude plugin validate .` checks the marketplace and plugin manifests. It currently passes with one warning that you can ignore: it says this CLAUDE.md isn't loaded as plugin context, which is intended because it's for working on the repo. 
 - To test locally, run `/plugin marketplace add ./` from the repo root, install the plugin, and confirm that the skill triggers on a representative prompt.

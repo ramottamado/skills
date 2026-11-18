@@ -13,6 +13,14 @@ Install from the [plugin marketplace](https://code.claude.com/docs/en/plugins/in
 /plugin install skills@ramottamado
 ```
 
+### Antigravity
+
+Install with the [Antigravity CLI](https://antigravity.google/docs/plugins/):
+
+```
+agy plugin install https://github.com/ramottamado/skills
+```
+
 ### npx skills
 
 Install with the [`npx skills`](https://skills.sh) CLI:

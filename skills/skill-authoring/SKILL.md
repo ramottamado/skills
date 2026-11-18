@@ -27,11 +27,12 @@ Use this skill to add or change skills in this repository so they install cleanl
 
 - Add the skill to the skill list in `README.md`.
 - Do not register the skill in any manifest. The plugin discovers `skills/*/SKILL.md` automatically.
-- For a release, bump `version` in both `.claude-plugin/plugin.json` and the root `plugin.json`, and keep the two files in sync.
+- For a release, bump `version` in `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`, and keep the two in sync.
 
 ## Validate
 
 - Run `claude plugin validate .` from the repository root.
+- Run `agy plugin validate .` (the missing-logo warning under `--strict` is expected).
 - Install the plugin locally with `/plugin marketplace add ./` and `/plugin install skills@ramottamado`. Confirm that the skill triggers on a representative prompt and stays quiet on a near miss.
 - Report the files that changed and any validation you could not run.
 
