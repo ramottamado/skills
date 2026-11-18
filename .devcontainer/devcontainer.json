@@ -49,6 +49,7 @@
 	"postCreateCommand": "npm install -g @devcontainers/cli",
 	"mounts": [
 		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gemini,target=/home/vscode/.gemini,type=bind,consistency=cached",
 		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
 		"source=uv-vol,target=/home/vscode/.uv,type=volume,chown=true",
 		"source=skills-venv,target=/home/vscode/.venv,type=volume,chown=true"
@@ -58,7 +59,10 @@
 			"settings": {
 				"python.defaultInterpreterPath": "/home/vscode/.venv/bin/python",
 				"python.terminal.activateEnvironment": false
-			}
+			},
+			"extensions": [
+				"google.google-antigravity"
+			]
 		}
 	}
 }
