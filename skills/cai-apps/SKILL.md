@@ -53,8 +53,8 @@ For writing the app scripts themselves (port binding, uv, health checks, Kerbero
 
 ## Prerequisites (check before the first deployment)
 
-1. **A service account to run the apps.** Add a CAI machine user to the project as a *run-as account* and note its numeric user ID. Otherwise apps run as whoever started them, and their Kerberos identity and injected API keys change with that person.
-2. **Read access for that account** to the project directory, including `.venv` and any `keytabs/` folder.
+1. **A service account to run the apps (optional).** Check whether the project has a *machine user* (CAI UI, project settings; ask the user if unsure). If it does, note its numeric user ID and use it as the run-as account. **If the project has none, do not set `run_as`**: leave it out of the manifest, skip `run-as`, and tell the user the apps will run as whoever started them, so their Kerberos identity and injected API keys change with that person. Never invent a user ID or substitute a normal collaborator.
+2. **Read access for that account** (skip if there is no service account) to the project directory, including `.venv` and any `keytabs/` folder.
 3. **A Kerberos keytab** if the app talks to a Kerberized service. Keep it in a gitignored folder. Find the principal with `klist -kt <keytab>`.
 4. **A long-lived service token** for app-to-app calls: a CAI API key created on purpose and accepted by the proxy as a Bearer token. **Never reuse the injected `CDSW_API_KEY` / `CDSW_APIV2_KEY`**: they belong to whoever runs the app and may be rotated underneath you.
 5. Any third-party API keys the apps need.
@@ -66,8 +66,8 @@ For writing the app scripts themselves (port binding, uv, health checks, Kerbero
 1. Write the manifest and export the non-secret values it references.
 2. **Preview, then create:** `create --dry-run`, then `create`. Existing apps are skipped.
 3. **Set secrets** on each app that needs them (`set <app> TOKEN=@file`). A shared token goes on every app in the chain.
-4. **Run as the service account:** `run-as <app> <user-id>` for each app. If CAI answers `500: Run as user does not have the right permissions for project`, the account is not yet a project *machine user*: add it in the CAI UI first (a normal collaborator with write access is not the same thing).
-5. **Start in dependency order** (upstream services first, UI last) with `restart <app>`, then `list`.
+4. **Run as the service account, only if the project has one:** `run-as <app> <user-id>` for each app. With no machine user, skip this step and leave `run_as` unset; nothing then needs a restart on account of run-as. If CAI answers `500: Run as user does not have the right permissions for project`, the account is not yet a project *machine user*: add it in the CAI UI first (a normal collaborator with write access is not the same thing).
+5. **Start in dependency order** (upstream services first, UI last) with `restart <app>` (`create` leaves the apps stopped, so this is their first start; it is not an extra restart). If you created with `--start` and no step after it changed an app (no `run-as`, and secrets were set before the first start or not needed), skip it and just `list`.
 6. **Verify** (below).
 
 Starting, stopping, restarting, changing run-as, and rotating tokens affect running services: confirm with the user before doing them on apps that already serve people.
@@ -94,7 +94,7 @@ TOKEN=$(cat ~/secrets/service-token)
 curl -s -H "Authorization: Bearer $TOKEN" https://<subdomain>.$CDSW_DOMAIN/<health-path>
 ```
 
-A request without the token gets a `302` to the CAI login page: the app is up and protected, not broken. Application logs are in the CAI UI (the application's page). Make each app's health endpoint report enough to see its config (for example which LLM or backend it is on) without exposing secrets.
+A request without the token gets a `302` to the CAI login page: the app is up and protected, not broken. Application logs are in the CAI UI (the application's page) only: API v2 has no endpoint for them (checked against swagger.json; recheck if the platform is upgraded), so the script has no `logs` command. Ask the user to paste the relevant log lines. Make each app's health endpoint report enough to see its config (for example which LLM or backend it is on) without exposing secrets.
 
 ## Troubleshooting
 
