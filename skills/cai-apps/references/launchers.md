@@ -4,34 +4,112 @@ A CAI Application runs one script. Each app is its own pod with the **project fi
 
 ## Rules every launcher must follow
 
-- **Don't derive the project root from `__file__` (or `sys.argv[0]`, `inspect`, etc.).** CAI runtimes are Jupyter-based: the platform runs the script through a Jupyter kernel (IPython), not as `python script.py`. `__file__` is then undefined or not the script's real path, so `Path(__file__).resolve().parents[n]` fails or points at the wrong directory. Use the fixed mount `/home/cdsw` (the project root, see above) with an optional override such as `PROJECT_ROOT`, as in the launcher below. Don't rely on the working directory being the project root either. The same applies to code the launcher imports from a notebook-style context; a normally started child process (the console script) has a real `__file__`.
+- **Don't derive the project root from `__file__` (or `sys.argv[0]`, `inspect`, etc.).** CAI runtimes are Jupyter-based: the platform runs the script through a Jupyter kernel (IPython), not as `python script.py`. `__file__` is then undefined or not the script's real path, so `Path(__file__).resolve().parents[n]` fails or points at the wrong directory. Use the fixed mount `/home/cdsw` (the project root, see above) with an optional override such as `PROJECT_ROOT`, as in the launcher below. Don't rely on the working directory being the project root either. A child process started by the launcher has a real `__file__`.
 - **Bind `127.0.0.1:$CDSW_APP_PORT`.** CAI sets the port and proxies to it. Never hard-code a port or bind `0.0.0.0`.
-- **Run with the runtime's system Python** (no project deps yet): the launcher installs deps, then starts the real process (a console script) in the foreground and exits with its status. Forward SIGTERM/SIGINT to the child.
-- **`uv sync --frozen --no-dev --inexact`, never without `--inexact`.** All apps and sessions share one `.venv`; an exact `--no-dev` sync strips dev tools out from under everyone else. Then start with `uv run --frozen --no-sync <entry>`.
+- **The launcher is plain Python on the runtime's system Python** (no project deps yet). It starts the real process in the foreground with `subprocess.run` and exits with its status, so when the program dies the app (and its kernel) dies with it. The program can be written in anything: Python, Node.js, Java.
+- **Python programs always run through uv: `uv sync --frozen --no-dev --inexact`, never without `--inexact`.** All apps and sessions share one `.venv`; an exact `--no-dev` sync strips dev tools out from under everyone else. Then start with `uv run --frozen --no-sync <entry>`.
+- **Don't capture the child's output** (`stdout=PIPE`): the log then appears only when the program exits. Let it inherit stdout/stderr so the app log is live.
 - **Serve relative URLs only.** CAI serves each app under a path prefix, so a UI must call `api/ask`, not `/api/ask`.
 - **Health endpoint = liveness only.** CAI restarts apps whose polling endpoint fails. Never make `/health` touch a database, warehouse, Kerberos or another app, or an upstream outage becomes a restart loop. Put dependency checks on a different path and set `CDSW_APP_POLLING_ENDPOINT` to the liveness one.
+- **Find the interpreter before writing the launcher** (`uv`, `java`, `npx`/`node`, `bash`). If it is not on `PATH` or in the project, ask the user rather than assuming a location.
 - **Fail fast on missing required env** with a message naming the variable; it lands in the app log.
 
-## Minimal launcher
+## Launcher script
+
+Keep the launcher thin: set the environment, then run the real program as a child process. The child is an ordinary process, so `__file__`, `sys.argv` and the working directory behave normally there. Only the marked block changes per app (see "Per language" below):
 
 ```python
-import os, shutil, signal, subprocess, sys
+import os, subprocess, sys
 from pathlib import Path
 
-root = Path(os.environ.get("PROJECT_ROOT", "/home/cdsw"))
-uv = shutil.which("uv") or str(Path.home() / ".local/bin/uv")
-if not Path(uv).exists():
-    sys.exit("uv not found. In a session terminal run: pip install --user uv")
-if not os.environ.get("CDSW_APP_PORT"):
-    sys.exit("CDSW_APP_PORT is not set: run this as a Cloudera AI Application.")
+port = os.environ.get("CDSW_APP_PORT") or sys.exit("CDSW_APP_PORT is not set: run this as a Cloudera AI Application.")
+root = Path(os.environ.get("PROJECT_ROOT", "/home/cdsw"))  # fixed path, never __file__
 
-subprocess.run([uv, "sync", "--frozen", "--no-dev", "--inexact"], cwd=root, check=True)
-proc = subprocess.Popen([uv, "run", "--frozen", "--no-sync", "my-entry-point"], cwd=root,
-                        env={**os.environ, "APP_HOST": "127.0.0.1"})
-for sig in (signal.SIGTERM, signal.SIGINT):
-    signal.signal(sig, lambda *_: proc.terminate())
-sys.exit(proc.wait())
+# --- edit only this block: working directory, command, environment (and host/port, see below) ---
+cwd = root
+cmd = ["my-program"]
+env = {**os.environ}                                      # host/port: see "How the program takes host and port"
+# ---------------------------------------------------------------------
+
+sys.exit(subprocess.run(cmd, cwd=cwd, env=env).returncode)
 ```
+
+`subprocess.run` blocks until the program exits and `sys.exit(<returncode>)` hands its status to CAI, so a failed start shows as one. Don't wrap it in `try`/`except` that prints and exits `1`, or use `check=True` (it raises a traceback instead): both hide the real exit code.
+
+### Per language (the block to edit)
+
+**Python**: always run through `uv`, even for a single script (`[..., "python", "main.py"]`). Install deps first, then run through `uv` so the project `.venv` is used. Find `uv` with `shutil.which("uv") or str(Path.home() / ".local/bin/uv")` (exit with a hint, `pip install --user uv`, if missing).
+
+```python
+subprocess.run([uv, "sync", "--frozen", "--no-dev", "--inexact"], cwd=root, check=True)
+cmd = [uv, "run", "--frozen", "--no-sync", "my-entry-point"]   # or [..., "python", "main.py"]
+```
+
+**Node.js (npx, npm scripts)**: the runtime may have no Node. Before writing the launcher, find `npx`/`node` (`shutil.which`, then look for a Node install in the project such as `node/bin`). **If neither is found, ask the user where Node is or how it should be installed; don't guess a path.** Put the install's `bin` first on `PATH`.
+
+```python
+env = {**os.environ, "PATH": f"{root}/node/bin:{os.environ.get('PATH', '')}"}
+cmd = ["npx", "my-node-app"]                          # or ["node", "server.js"], ["npm", "start"]
+```
+
+**Java (jar)**: before writing the launcher, find `java` (`shutil.which`, then look for a JDK in the project such as `jdk/bin/java`) and check its version against what the program needs. **If none is found, ask the user where the JDK is or how it should be installed; don't guess a path.** Use the JDK path explicitly in `cmd` (the runtime's Java may be missing or the wrong version), and pass JVM options (`-D...`) as separate list items before `-jar`.
+
+```python
+cmd = [f"{root}/jdk/bin/java", "-jar", f"{root}/app.jar"]
+```
+
+**Bash script**: the launcher itself stays Python (the kernel runs Python), so call the script as the child. Invoke it through `bash` rather than relying on the executable bit, and pass the root (and host/port) as env vars.
+
+```python
+env = {**os.environ, "PROJECT_ROOT": str(root)}
+cmd = ["bash", f"{root}/scripts/start.sh"]
+```
+
+Inside the script, start with `set -euo pipefail` so a failed setup step stops the app with a non-zero status, `cd "$PROJECT_ROOT"` (the script runs as an ordinary process, so `$0` is also reliable), finish with `exec <program> ...` so the program replaces the shell and its exit status becomes the script's. Without `exec`, the shell's last command status is returned and signals reach only the shell.
+
+For a Kerberized app, see "Kerberos from a keytab" below.
+
+### How the program takes host and port
+
+The option names belong to the program, not to this skill, so never copy them from memory or from another program. Find them in this order: the program's own docs and `--help` (search the web for its configuration reference if the project doesn't include it), then the project's existing config, then ask the user. Then use whichever mechanism the program supports:
+
+| It takes host/port from | In the edit block |
+|---|---|
+| Environment variables | Add them to `env`: `{**os.environ, "<HOST_VAR>": "127.0.0.1", "<PORT_VAR>": port}`. For a bash script, pass them the same way and use them in its `exec` line. |
+| CLI flags | Append them to `cmd`: `[..., "<host-flag>", "127.0.0.1", "<port-flag>", port]`. For Java, JVM `-D` properties go before `-jar`. |
+| Nothing (hard-coded port or `0.0.0.0`) | Look for an undocumented env var or config key first; otherwise start it from a small entry script that calls its API with `host="127.0.0.1", port=...`. Don't put a reverse proxy in front of it. |
+
+Always take the port from `CDSW_APP_PORT`. It is often `8100`, but read it from the environment rather than hard-coding the number, since the platform decides it.
+
+## Trusting an internal CA
+
+If the program calls HTTPS services signed by a private CA (the platform's own proxy, an internal API, an LLM gateway), it fails with certificate errors unless it trusts that CA. Ask the user where the CA certificate (PEM) is; don't guess. Keep it in the project, and set the runtime's own option in the launcher's `env` or `cmd`:
+
+| Runtime | Setting | Notes |
+|---|---|---|
+| Node.js | `NODE_EXTRA_CA_CERTS=<ca.pem>` | Adds to the built-in roots. |
+| Python (`requests`) | `REQUESTS_CA_BUNDLE=<bundle.pem>` | Replaces the default bundle. |
+| Python (`ssl`, `httpx`, `urllib`, `uv`) | `SSL_CERT_FILE=<bundle.pem>` | Replaces the default roots. `uv` itself can also use `SSL_CERT_FILE` or `--native-tls`; check its docs. |
+| Java | `-Djavax.net.ssl.trustStore=<truststore.jks>` and `-Djavax.net.ssl.trustStorePassword=<password>` in `cmd`, before `-jar` | Java has no "extra CA" option: build a truststore that contains the CA (below). |
+
+For the Python settings, a bundle that replaces the defaults must also contain the public roots if the program calls public services: concatenate the system bundle and the internal CA into one file. Check the library's docs for the exact variable, since libraries differ.
+
+For Java, create the truststore once (a session terminal or a pre-step), starting from a copy of the JDK's `lib/security/cacerts` so public roots stay trusted, then import the CA:
+
+```bash
+cp "$JAVA_HOME/lib/security/cacerts" truststore.jks
+keytool -importcert -noprompt -alias internal-ca -file ca.pem -keystore truststore.jks
+```
+
+`keytool` asks for the truststore password. Treat it as a secret, like any other: put it in the app's environment with `cai_apps.py set <app> TRUSTSTORE_PASSWORD=@/path/to/chmod-600-file` (see SKILL.md; names ending `_PASSWORD` are masked), and have the launcher read it, failing fast if it is unset:
+
+```python
+pw = os.environ.get("TRUSTSTORE_PASSWORD") or sys.exit("TRUSTSTORE_PASSWORD is not set")
+cmd = [f"{root}/jdk/bin/java", f"-Djavax.net.ssl.trustStore={root}/truststore.jks",
+       f"-Djavax.net.ssl.trustStorePassword={pw}", "-jar", f"{root}/app.jar"]
+```
+
+Never hard-code it in the launcher or commit it. Keep the CA and truststore in the project.
 
 ## Kerberos from a keytab
 
@@ -39,6 +117,17 @@ CAI starts an app with a ticket for the run-as user, but it lasts about 15 minut
 
 - Keep the keytab in a gitignored folder (e.g. `keytabs/`), readable by the run-as account.
 - In the launcher, run `kinit -kt <keytab> <principal>` at start and then every ~hour from a daemon thread, into a **dedicated credential cache** (`KRB5CCNAME=FILE:/tmp/<app>_krb5cc_<uid>`), so it never clobbers the ticket CAI injected. Pass `KRB5CCNAME` to the child.
+- **Java programs** are configured through JVM options rather than just the ticket cache. Keep `krb5.conf` and a JAAS file in the project and pass them as JVM options in `cmd`, before `-jar`:
+
+  ```python
+  cmd = [f"{root}/jdk/bin/java",
+         f"-Djava.security.krb5.conf={root}/krb5.conf",
+         f"-Djava.security.auth.login.config={root}/jaas.conf",
+         "-Djavax.security.auth.useSubjectCredsOnly=false",
+         "-jar", f"{root}/app.jar"]
+  ```
+
+  For troubleshooting add `-Dsun.security.krb5.debug=true`, `-Dsun.security.jgss.debug=true` and `-Dsun.security.spnego.debug=true` temporarily; they are verbose, so remove them afterwards. The JAAS file's login module and its options depend on the program, so take them from its docs.
 - Make the initial failure fatal only if the Kerberized service is actually required, and log refreshes ("refreshed Kerberos ticket") so you can verify them later.
 
 ## MCP servers behind the CAI proxy
