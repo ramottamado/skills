@@ -28,7 +28,7 @@ An app is addressed by subdomain or name. Variable names ending `_KEY`, `_TOKEN`
 
 The manifest (non-secret app definitions) format is in [references/apps.example.json](references/apps.example.json): `runtime_match` (substring of the runtime image id; the newest enabled match is used) and `apps[]` with `name`, `subdomain`, `script`, `cpu`, `memory`, `description`, `env`. `${VAR}` and `${VAR:-default}` in `env` values are filled from the local environment; `create` aborts and lists any unset variable without a default.
 
-For writing the app scripts themselves (port binding, uv, health checks, Kerberos refresh, app-to-app calls) read [references/launchers.md](references/launchers.md).
+For writing the app scripts themselves (port binding, uv, no `__file__` because runtimes are Jupyter-based, health checks, Kerberos refresh, app-to-app calls) read [references/launchers.md](references/launchers.md).
 
 ## Workflow
 

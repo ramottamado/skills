@@ -4,6 +4,7 @@ A CAI Application runs one script. Each app is its own pod with the **project fi
 
 ## Rules every launcher must follow
 
+- **Don't derive the project root from `__file__` (or `sys.argv[0]`, `inspect`, etc.).** CAI runtimes are Jupyter-based: the platform runs the script through a Jupyter kernel (IPython), not as `python script.py`. `__file__` is then undefined or not the script's real path, so `Path(__file__).resolve().parents[n]` fails or points at the wrong directory. Use the fixed mount `/home/cdsw` (the project root, see above) with an optional override such as `PROJECT_ROOT`, as in the launcher below. Don't rely on the working directory being the project root either. The same applies to code the launcher imports from a notebook-style context; a normally started child process (the console script) has a real `__file__`.
 - **Bind `127.0.0.1:$CDSW_APP_PORT`.** CAI sets the port and proxies to it. Never hard-code a port or bind `0.0.0.0`.
 - **Run with the runtime's system Python** (no project deps yet): the launcher installs deps, then starts the real process (a console script) in the foreground and exits with its status. Forward SIGTERM/SIGINT to the child.
 - **`uv sync --frozen --no-dev --inexact`, never without `--inexact`.** All apps and sessions share one `.venv`; an exact `--no-dev` sync strips dev tools out from under everyone else. Then start with `uv run --frozen --no-sync <entry>`.
