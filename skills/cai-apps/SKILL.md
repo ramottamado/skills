@@ -18,6 +18,7 @@ uv run --script cai_apps.py set <app> KEY=value KEY2=@/path/file [--unset K] [--
 uv run --script cai_apps.py restart <app>                         # also starts a stopped app; waits
 uv run --script cai_apps.py stop <app>
 uv run --script cai_apps.py run-as <app> <numeric-user-id>
+uv run --script cai_apps.py public <app> on|off [--yes] [--restart] [--dry-run]   # unauthenticated access
 uv run --script cai_apps.py create [--manifest deploy/apps.json] [--dry-run] [--start]
 uv run --script cai_apps.py backup [app ...] [-o file.json]   # all apps by default
 uv run --script cai_apps.py restore <file.json> [app ...] [--dry-run] [--start]
@@ -26,7 +27,7 @@ uv run --script cai_apps.py delete <app> [--backup file.json] [--yes] [--dry-run
 
 An app is addressed by subdomain or name. Variable names ending `_KEY`, `_TOKEN`, `_SECRET`, `_PASSWORD` are treated as secrets and masked.
 
-The manifest (non-secret app definitions) format is in [references/apps.example.json](references/apps.example.json): `runtime_match` (substring of the runtime image id; the newest enabled match is used) and `apps[]` with `name`, `subdomain`, `script`, `cpu`, `memory`, `description`, `env`. `${VAR}` and `${VAR:-default}` in `env` values are filled from the local environment; `create` aborts and lists any unset variable without a default.
+The manifest (non-secret app definitions) format is in [references/apps.example.json](references/apps.example.json): `runtime_match` (substring of the runtime image id; the newest enabled match is used) and `apps[]` with `name`, `subdomain`, `script`, `cpu`, `memory`, `description`, `env`, and optionally `bypass_authentication`. `${VAR}` and `${VAR:-default}` in `env` values are filled from the local environment; `create` aborts and lists any unset variable without a default.
 
 To try a launcher in the current session before creating the Application (three session ports, health probe, browser URL), use [scripts/test_app.py](scripts/test_app.py) and read [references/session-testing.md](references/session-testing.md).
 
@@ -35,7 +36,7 @@ For writing the app scripts themselves (port binding, Python, Node.js, Java and 
 ## Workflow
 
 1. **Inspect:** `list` and `env <app>` show what is deployed, who it runs as, and its config. Read the project's launcher scripts and manifest before changing anything.
-2. **Retrieve docs:** the API reference is the OpenAPI document at `https://$CDSW_DOMAIN/api/v2/swagger.json`. Check it rather than trusting memory.
+2. **Retrieve docs:** before any change that touches an API field or endpoint, fetch the workbench's own OpenAPI document, `https://$CDSW_DOMAIN/api/v2/swagger.json`, and check the field there; the deployed version is the authority, not memory or the web. If the fetch fails with a certificate error (a private CA), do not turn verification off on your own: use the platform's CA bundle (see "Trusting an internal CA" in [references/launchers.md](references/launchers.md)) or ask the user.
 3. **Apply:** follow "First deployment" or "Common operations" below. Use `--dry-run` first. For a new app, run `test_app.py` first.
 4. **Validate:** `list` for status, then the checks in "Verifying a deployment".
 5. **Report:** which apps changed, which variables were set or removed (names only, never values), what was restarted, and any step you could not run.
@@ -46,6 +47,7 @@ For writing the app scripts themselves (port binding, Python, Node.js, Java and 
 
 ## Facts that cost time to learn
 
+- **`"bypass_authentication": true` in the manifest makes an app reachable without logging in to CAI** (the `bypass_authentication` field of the create request). Anyone who has the URL can call it, so only use it for apps that are meant to be public or that authenticate callers themselves, and confirm with the user first. `create --dry-run` shows the value. Default is `false`. To change an existing app use `public <app> on|off`; turning it on asks you to type the subdomain unless `--yes` (never pass `--yes` on your own initiative), and the command reads the value back because a PATCH may ignore `false`.
 - **Creating an app starts it immediately**, half-configured. `create` stops each new app straight away unless `--start`.
 - **`environment` is a JSON-encoded string and `PATCH` replaces it whole.** A naive PATCH with one key wipes the rest; the script always sends the full merged dict. Do the same if you call the API directly.
 - **Env var changes need a restart.** Variables are read at process start. A `set` that "worked" but changed nothing means you did not restart.
@@ -96,7 +98,7 @@ TOKEN=$(cat ~/secrets/service-token)
 curl -s -H "Authorization: Bearer $TOKEN" https://<subdomain>.$CDSW_DOMAIN/<health-path>
 ```
 
-A request without the token gets a `302` to the CAI login page: the app is up and protected, not broken. Application logs are in the CAI UI (the application's page) only: API v2 has no endpoint for them (checked against swagger.json; recheck if the platform is upgraded), so the script has no `logs` command. Ask the user to paste the relevant log lines. Make each app's health endpoint report enough to see its config (for example which LLM or backend it is on) without exposing secrets.
+A request without the token gets a `302` to the CAI login page: the app is up and protected, not broken. An app created with `"bypass_authentication": true` is the exception: it answers anyone who has the URL, with no login (`list` marks it `PUBLIC`). Application logs are in the CAI UI (the application's page) only: API v2 has no endpoint for them (checked against swagger.json; recheck if the platform is upgraded), so the script has no `logs` command. Ask the user to paste the relevant log lines. Make each app's health endpoint report enough to see its config (for example which LLM or backend it is on) without exposing secrets.
 
 ## Troubleshooting
 
@@ -109,7 +111,7 @@ A request without the token gets a `302` to the CAI login page: the app is up an
 | `set` succeeded, nothing changed | No restart. |
 | `500 ... right permissions` setting run-as | Account is not a project machine user yet. |
 | Certificate error on an old URL | Subdomain was changed; use the new one. |
-| `302` to login from a script | Missing or wrong Bearer token (or a token that was revoked/rotated). |
+| `302` to login from a script | Missing or wrong Bearer token (or a token that was revoked/rotated), or the app was not created with `bypass_authentication`. |
 | App-to-app call fails with 401/302 | Caller's token env var is unset or differs from the one the callee's proxy accepts; check with `env <app>` (masked values show only `<set>`; compare with `--reveal` only if the user agrees). |
 
 ## Without the script

@@ -16,6 +16,7 @@ Run with `uv run --script cai_apps.py ...` (standard library only; plain `python
   cai_apps.py restart my-service               # also starts a stopped app
   cai_apps.py stop my-service
   cai_apps.py run-as my-service 20                 # numeric id of a project machine user
+  cai_apps.py public my-service on|off [--yes] [--restart] [--dry-run]   # unauthenticated access on an existing app
   cai_apps.py create [--dry-run] [--start]      # from the manifest
   cai_apps.py backup [app ...] [-o FILE]          # create payloads incl. env (secrets in clear), mode 600
   cai_apps.py restore FILE [app ...] [--dry-run] [--start]   # recreate apps missing from the project
@@ -154,7 +155,8 @@ def cmd_list(api: Api, _: argparse.Namespace) -> None:
         e = env_of(a)
         print(
             f"{a['subdomain']:<12} {a['status']:<22} run_as={a.get('run_as', 0):<4} "
-            f"health={e.get('CDSW_APP_POLLING_ENDPOINT', '-'):<12} {a['name']}"
+            f"health={e.get('CDSW_APP_POLLING_ENDPOINT', '-'):<12} "
+            f"{'PUBLIC ' if a.get('bypass_authentication') else ''}{a['name']}"
         )
 
 
@@ -203,6 +205,29 @@ def cmd_run_as(api: Api, args: argparse.Namespace) -> None:
     print(f"{app['subdomain']}: run_as={args.user_id}")
 
 
+def cmd_public(api: Api, args: argparse.Namespace) -> None:
+    """Toggle `bypass_authentication` (unauthenticated access) on an existing app."""
+    app = find_app(api.apps(), args.app)
+    want = args.state == "on"
+    now = bool(app.get("bypass_authentication"))
+    print(f"{app['subdomain']}: unauthenticated access is {'on' if now else 'off'}, requested {args.state}")
+    if now == want or args.dry_run:
+        return
+    if want and not args.yes:
+        if not sys.stdin.isatty():
+            sys.exit("Refusing to open an app to unauthenticated access without confirmation: pass --yes, or run from a terminal.")
+        if input(f"Anyone with the URL will reach it without login. Type the subdomain {app['subdomain']!r} to confirm: ").strip() != app["subdomain"]:
+            sys.exit("Subdomain did not match; nothing changed.")
+    api.call("PATCH", f"{api.apps_path}/{app['id']}", {"bypass_authentication": want})
+    # A PATCH can silently ignore a false/zero value, so read it back instead of trusting the 200.
+    got = bool(api.call("GET", f"{api.apps_path}/{app['id']}").get("bypass_authentication"))
+    if got != want:
+        sys.exit(f"{app['subdomain']}: PATCH returned OK but bypass_authentication is still {got}. Change it in the CAI UI.")
+    print(f"{app['subdomain']}: unauthenticated access {'on' if got else 'off'}" + ("" if args.restart else "; restart the app if it does not take effect"))
+    if args.restart:
+        restart(api, app)
+
+
 def resolve_runtime(api: Api, match: str) -> str:
     runtimes = api.call("GET", "/runtimes?page_size=200").get("runtimes", [])
     ids = sorted(
@@ -240,7 +265,7 @@ def cmd_create(api: Api, args: argparse.Namespace) -> None:
             "project_id": api.project,
             "kernel": "",
             "runtime_identifier": runtime,
-            "bypass_authentication": False,
+            "bypass_authentication": bool(spec.get("bypass_authentication", False)),
         }
         if args.dry_run:
             print(f"{spec['subdomain']}: would create {json.dumps({**body, 'environment': mask(spec['environment'])})}")
@@ -368,6 +393,13 @@ def main() -> None:
     s.add_argument("app")
     s.add_argument("user_id", type=int)
     s.set_defaults(fn=cmd_run_as)
+    s = sub.add_parser("public", help="turn unauthenticated access (bypass_authentication) on or off for an app")
+    s.add_argument("app")
+    s.add_argument("state", choices=["on", "off"])
+    s.add_argument("--yes", action="store_true", help="skip the typed confirmation when turning it on")
+    s.add_argument("--restart", action="store_true")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_public)
     s = sub.add_parser("create", help="create the manifest's apps that don't exist yet")
     s.add_argument("--manifest", help="path to the manifest (default: deploy/apps.json)")
     s.add_argument("--dry-run", action="store_true")
