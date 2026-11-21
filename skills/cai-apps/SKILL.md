@@ -17,7 +17,8 @@ uv run --script cai_apps.py env <app> [--reveal]                  # secrets mask
 uv run --script cai_apps.py set <app> KEY=value KEY2=@/path/file [--unset K] [--restart] [--dry-run]
 uv run --script cai_apps.py restart <app>                         # also starts a stopped app; waits
 uv run --script cai_apps.py stop <app>
-uv run --script cai_apps.py run-as <app> <numeric-user-id>
+uv run --script cai_apps.py users [--all] [--json]                # machine users (valid run-as ids), who runs as whom
+uv run --script cai_apps.py run-as <app> <numeric-user-id> [--no-check]   # refuses an id that is not a machine user
 uv run --script cai_apps.py public <app> on|off [--yes] [--restart] [--dry-run]   # unauthenticated access
 uv run --script cai_apps.py create [--manifest deploy/apps.json] [--dry-run] [--start]
 uv run --script cai_apps.py backup [app ...] [-o file.json]   # all apps by default
@@ -57,7 +58,7 @@ For writing the app scripts themselves (port binding, Python, Node.js, Java and 
 
 ## Prerequisites (check before the first deployment)
 
-1. **A service account to run the apps (optional).** Check whether the project has a *machine user* (CAI UI, project settings; ask the user if unsure). If it does, note its numeric user ID and use it as the run-as account. **If the project has none, do not set `run_as`**: leave it out of the manifest, skip `run-as`, and tell the user the apps will run as whoever started them, so their Kerberos identity and injected API keys change with that person. Never invent a user ID or substitute a normal collaborator.
+1. **A service account to run the apps (optional).** Run `users`: it lists the project's *machine users* with their numeric IDs (from `GET /projects/{id}/machineusers`), the only accounts an app can run as. If there is one, use its ID as the run-as account; if there are several, ask the user which. `users --all` adds the collaborators and their permissions, but that listing has no numeric IDs. **If `users` lists none, do not set `run_as`**: leave it out of the manifest, skip `run-as`, and tell the user the apps will run as whoever started them, so their Kerberos identity and injected API keys change with that person. Never invent a user ID or substitute a normal collaborator.
 2. **Read access for that account** (skip if there is no service account) to the project directory, including `.venv` and any `keytabs/` folder.
 3. **A Kerberos keytab** if the app talks to a Kerberized service. Keep it in a gitignored folder. Find the principal with `klist -kt <keytab>`.
 4. **A long-lived service token** for app-to-app calls: a CAI API key created on purpose and accepted by the proxy as a Bearer token. **Never reuse the injected `CDSW_API_KEY` / `CDSW_APIV2_KEY`**: they belong to whoever runs the app and may be rotated underneath you.
@@ -70,7 +71,7 @@ For writing the app scripts themselves (port binding, Python, Node.js, Java and 
 1. Write the manifest and export the non-secret values it references.
 2. **Preview, then create:** `create --dry-run`, then `create`. Existing apps are skipped.
 3. **Set secrets** on each app that needs them (`set <app> TOKEN=@file`). A shared token goes on every app in the chain.
-4. **Run as the service account, only if the project has one:** `run-as <app> <user-id>` for each app. With no machine user, skip this step and leave `run_as` unset; nothing then needs a restart on account of run-as. If CAI answers `500: Run as user does not have the right permissions for project`, the account is not yet a project *machine user*: add it in the CAI UI first (a normal collaborator with write access is not the same thing).
+4. **Run as the service account, only if the project has one:** `run-as <app> <user-id>` for each app. It checks the ID against the machine-user list first and refuses an unknown one; `--no-check` skips that, for when the list cannot be read (the check then only warns). With no machine user, skip this step and leave `run_as` unset; nothing then needs a restart on account of run-as. If CAI answers `500: Run as user does not have the right permissions for project`, the account is not yet a project *machine user*: add it in the CAI UI first (a normal collaborator with write access is not the same thing).
 5. **Start in dependency order** (upstream services first, UI last) with `restart <app>` (`create` leaves the apps stopped, so this is their first start; it is not an extra restart). If you created with `--start` and no step after it changed an app (no `run-as`, and secrets were set before the first start or not needed), skip it and just `list`.
 6. **Verify** (below).
 
@@ -109,14 +110,15 @@ A request without the token gets a `302` to the CAI login page: the app is up an
 | Exits at start with a Kerberos error | Run-as account cannot read the keytab (check `/home/cdsw` and `keytabs/` permissions), principal does not match the keytab, or the KDC/realm is unreachable. |
 | Auth errors after ~15 min to hours | CAI-issued tickets last about 15 minutes. Refresh from a keytab into a dedicated ccache (see launchers.md) and check the log shows refreshes. |
 | `set` succeeded, nothing changed | No restart. |
-| `500 ... right permissions` setting run-as | Account is not a project machine user yet. |
+| `500 ... right permissions` setting run-as | Account is not a project machine user yet (`users` shows the ones that are). |
+| `users` warns an app runs as an id that is not a machine user | The account lost machine-user status, or run-as was set with `--no-check`. Pick a listed machine user and `run-as` again. |
 | Certificate error on an old URL | Subdomain was changed; use the new one. |
 | `302` to login from a script | Missing or wrong Bearer token (or a token that was revoked/rotated), or the app was not created with `bypass_authentication`. |
 | App-to-app call fails with 401/302 | Caller's token env var is unset or differs from the one the callee's proxy accepts; check with `env <app>` (masked values show only `<set>`; compare with `--reveal` only if the user agrees). |
 
 ## Without the script
 
-Base `https://$CDSW_DOMAIN/api/v2/projects/$CDSW_PROJECT_ID/applications` with `Authorization: Bearer $CDSW_APIV2_KEY`. `GET` lists (paginated with `page_size` and `page_token`; follow `next_page_token`), `POST` creates, `PATCH .../{id}` updates, and `POST .../{id}:restart` and `:stop` control state. Statuses include `APPLICATION_STARTING` and `APPLICATION_STOPPING`, so wait for them to settle. Everything else is in the swagger document above.
+Base `https://$CDSW_DOMAIN/api/v2/projects/$CDSW_PROJECT_ID/applications` with `Authorization: Bearer $CDSW_APIV2_KEY`. `GET` lists (paginated with `page_size` and `page_token`; follow `next_page_token`), `POST` creates, `PATCH .../{id}` updates, and `POST .../{id}:restart` and `:stop` control state. Machine users (valid `run_as` ids) are `GET .../projects/$CDSW_PROJECT_ID/machineusers` (`run_as_machine_user_collaborators[]` with `user_id`, `user_name`), and `GET .../users/{user_id}` names an id. Statuses include `APPLICATION_STARTING` and `APPLICATION_STOPPING`, so wait for them to settle. Everything else is in the swagger document above.
 
 ## Skill feedback
 

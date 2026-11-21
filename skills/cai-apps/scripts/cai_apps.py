@@ -15,7 +15,8 @@ Run with `uv run --script cai_apps.py ...` (standard library only; plain `python
   cai_apps.py set my-service --unset OLD_VAR
   cai_apps.py restart my-service               # also starts a stopped app
   cai_apps.py stop my-service
-  cai_apps.py run-as my-service 20                 # numeric id of a project machine user
+  cai_apps.py users [--all] [--json]               # machine users (valid run-as ids) and who runs what
+  cai_apps.py run-as my-service 20 [--no-check]    # numeric id of a project machine user
   cai_apps.py public my-service on|off [--yes] [--restart] [--dry-run]   # unauthenticated access on an existing app
   cai_apps.py create [--dry-run] [--start]      # from the manifest
   cai_apps.py backup [app ...] [-o FILE]          # create payloads incl. env (secrets in clear), mode 600
@@ -100,6 +101,14 @@ def expand(value: str, environ: dict[str, str], missing: set[str]) -> str:
     return _VAR.sub(repl, value)
 
 
+class ApiError(Exception):
+    """An HTTP error from the API, raised only by calls made with `fatal=False`."""
+
+    def __init__(self, method: str, path: str, code: int, body: str) -> None:
+        super().__init__(f"{method} {path} failed: HTTP {code} {body}")
+        self.code = code
+
+
 def find_app(apps: list[dict], ident: str) -> dict:
     for a in apps:
         if ident.lower() in (a["subdomain"].lower(), a["name"].lower(), a["id"]):
@@ -120,7 +129,7 @@ class Api:
             sys.exit(f"{exc.args[0]} is not set. Run this from a CAI session in the project.")
         self.base = f"https://{self.domain}/api/v2"
 
-    def call(self, method: str, path: str, body: dict | None = None) -> dict:
+    def call(self, method: str, path: str, body: dict | None = None, fatal: bool = True) -> dict:
         req = urllib.request.Request(
             f"{self.base}{path}",
             json.dumps(body).encode() if body is not None else None,
@@ -131,7 +140,10 @@ class Api:
             with urllib.request.urlopen(req, timeout=60) as res:
                 return json.loads(res.read() or b"{}")
         except urllib.error.HTTPError as exc:
-            sys.exit(f"{method} {path} failed: HTTP {exc.code} {exc.read().decode()[:300]}")
+            err = ApiError(method, path, exc.code, exc.read().decode()[:300])
+            if fatal:
+                sys.exit(str(err))
+            raise err from None
         except urllib.error.URLError as exc:
             hint = ""
             if "CERTIFICATE" in str(exc.reason).upper():
@@ -142,13 +154,13 @@ class Api:
     def apps_path(self) -> str:
         return f"/projects/{self.project}/applications"
 
-    def paged(self, path: str, key: str, page_size: int = 100) -> list[dict]:
+    def paged(self, path: str, key: str, page_size: int = 100, fatal: bool = True) -> list[dict]:
         """GET every page of a list endpoint, following `next_page_token`."""
         items: list[dict] = []
         token = ""
         while True:
             query = f"?page_size={page_size}" + (f"&page_token={urllib.parse.quote(token)}" if token else "")
-            page = self.call("GET", path + query)
+            page = self.call("GET", path + query, fatal=fatal)
             items += page.get(key, [])
             token = page.get("next_page_token", "")
             if not token:
@@ -156,6 +168,14 @@ class Api:
 
     def apps(self) -> list[dict]:
         return self.paged(self.apps_path, "applications")
+
+    def machine_users(self, fatal: bool = True) -> list[dict]:
+        """The project's machine users, `{user_id, user_name}`: the only accounts an app can run as."""
+        return self.paged(f"/projects/{self.project}/machineusers", "run_as_machine_user_collaborators", fatal=fatal)
+
+    def collaborators(self) -> list[dict]:
+        """`{user: {username, name, email}, permission}`. This listing carries no numeric user id."""
+        return self.paged(f"/projects/{self.project}/collaborators", "collaborators")
 
     def wait(self, app_id: str, timeout: int = 300, grace: int = 10) -> str:
         """Poll until the app leaves STARTING/STOPPING. The status can still show the old state right after a
@@ -221,8 +241,73 @@ def cmd_stop(api: Api, args: argparse.Namespace) -> None:
     print(f"{app['subdomain']}: stopping ... {api.wait(app['id'])}")
 
 
+def short_user(api: Api, user_id: int) -> dict:
+    """`GET /users/{id}` (username, name, email), or {} if the caller may not look the user up."""
+    try:
+        return api.call("GET", f"/users/{user_id}", fatal=False)
+    except ApiError:
+        return {}
+
+
+def cmd_users(api: Api, args: argparse.Namespace) -> None:
+    """Machine users with their ids, the apps running as each, and run-as ids that are not machine users."""
+    machines = api.machine_users()
+    runs: dict[int, list[str]] = {}
+    for a in api.apps():
+        if a.get("run_as"):
+            runs.setdefault(int(a["run_as"]), []).append(a["subdomain"])
+    machine_ids = {int(m["user_id"]) for m in machines}
+    # An app can keep a run_as id that has since stopped being a machine user; name it so it can be fixed.
+    stray = {uid: short_user(api, uid) for uid in runs if uid not in machine_ids}
+    # Emails are left out of every output, --json included.
+    collabs = [
+        {
+            "username": c.get("user", {}).get("username", ""),
+            "name": c.get("user", {}).get("name", ""),
+            "permission": c.get("permission", ""),
+        }
+        for c in (api.collaborators() if args.all else [])
+    ]
+    if args.json:
+        doc = {
+            "machine_users": [{**m, "apps": runs.get(int(m["user_id"]), [])} for m in machines],
+            "other_run_as": [
+                {"user_id": uid, "user_name": u.get("username", ""), "apps": runs[uid]} for uid, u in stray.items()
+            ],
+        }
+        if args.all:
+            doc["collaborators"] = collabs
+        print(json.dumps(doc, indent=2))
+        return
+    if machines:
+        print("machine users (valid run-as ids):")
+        for m in machines:
+            apps = ", ".join(runs.get(int(m["user_id"]), [])) or "-"
+            print(f"  {m['user_id']:<6} {m.get('user_name', ''):<24} apps: {apps}")
+    else:
+        print("no machine users in this project: leave run_as unset (apps then run as whoever starts them)")
+    for uid, u in stray.items():
+        print(f"warning: {', '.join(runs[uid])} run as id {uid} ({u.get('username') or 'unknown'}), not a machine user")
+    if args.all:
+        names = {m.get("user_name") for m in machines}
+        print("collaborators (no numeric ids in this listing):")
+        for c in collabs:
+            tag = "MACHINE " if c["username"] in names else ""
+            print(f"  {c['username']:<24} {c['permission']:<10} {tag}{c['name']}")
+
+
 def cmd_run_as(api: Api, args: argparse.Namespace) -> None:
     app = find_app(api.apps(), args.app)
+    if not args.no_check:
+        try:
+            machines = api.machine_users(fatal=False)
+        except ApiError as exc:
+            print(f"warning: could not list machine users ({exc}); not checking id {args.user_id}", file=sys.stderr)
+        else:
+            known = {int(m["user_id"]): m.get("user_name", "") for m in machines}
+            if args.user_id not in known:
+                listed = ", ".join(f"{i} ({n})" for i, n in known.items()) or "none: leave run_as unset"
+                sys.exit(f"{args.user_id} is not a machine user of this project. Machine users: {listed}. See `users`.")
     api.call("PATCH", f"{api.apps_path}/{app['id']}", {"run_as": args.user_id})
     print(f"{app['subdomain']}: run_as={args.user_id}")
 
@@ -427,9 +512,14 @@ def main() -> None:
         s = sub.add_parser(name)
         s.add_argument("app")
         s.set_defaults(fn=fn)
+    s = sub.add_parser("users", help="machine users (valid run-as ids) and the apps running as each")
+    s.add_argument("--all", action="store_true", help="also list every collaborator and their permission")
+    s.add_argument("--json", action="store_true", help="print JSON (emails are never included)")
+    s.set_defaults(fn=cmd_users)
     s = sub.add_parser("run-as", help="run an app as a project machine user")
     s.add_argument("app")
     s.add_argument("user_id", type=int)
+    s.add_argument("--no-check", action="store_true", help="skip checking the id against the machine-user list")
     s.set_defaults(fn=cmd_run_as)
     s = sub.add_parser("public", help="turn unauthenticated access (bypass_authentication) on or off for an app")
     s.add_argument("app")
