@@ -144,9 +144,7 @@ def check_volume_owners(config, errors):
         if mount.get("type") == "volume" and not chown:
             errors.append(f'volume {mount.get("source")} at {mount.get("target")} needs chown=true')
         elif mount.get("type") == "bind" and chown:
-            errors.append(
-                f'bind mount {mount.get("source")} has chown=true, which re-owns the host files; remove it'
-            )
+            errors.append(f'bind mount {mount.get("source")} has chown=true, which re-owns the host files; remove it')
 
 
 def check_env(config, required, errors):
@@ -159,7 +157,7 @@ def check_env(config, required, errors):
 def check_install_order(config, java, errors):
     """common-utils, node, claude-code install first in that order; java, if present, last."""
     order = [re.sub(r"[:@][^/]*$", "", f) for f in config.get("overrideFeatureInstallOrder", [])]
-    if order[:len(FIRST_FEATURES)] != list(FIRST_FEATURES):
+    if order[: len(FIRST_FEATURES)] != list(FIRST_FEATURES):
         errors.append(f'"overrideFeatureInstallOrder" must start with {list(FIRST_FEATURES)}')
     if java and order[-1:] != [JAVA_FEATURE]:
         errors.append(f'"overrideFeatureInstallOrder" must end with {JAVA_FEATURE!r} so it installs last')

@@ -42,9 +42,22 @@ from pathlib import Path
 SECRET_SUFFIXES = ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD")
 # Fields of CreateApplicationRequest (swagger) that an Application also carries, minus `environment`/`project_id`.
 PAYLOAD_FIELDS = (
-    "name", "subdomain", "description", "script", "cpu", "memory", "nvidia_gpu", "kernel",
-    "bypass_authentication", "runtime_identifier", "runtime_addon_identifiers", "run_as", "cdv_app",
-    "accelerator_label_id", "resource_group_id", "resource_profile_id",
+    "name",
+    "subdomain",
+    "description",
+    "script",
+    "cpu",
+    "memory",
+    "nvidia_gpu",
+    "kernel",
+    "bypass_authentication",
+    "runtime_identifier",
+    "runtime_addon_identifiers",
+    "run_as",
+    "cdv_app",
+    "accelerator_label_id",
+    "resource_group_id",
+    "resource_profile_id",
 )
 UNSET_IF_FALSY = {"run_as", "accelerator_label_id", "resource_group_id", "resource_profile_id"}
 TRANSITIONAL = {"APPLICATION_UNKNOWN", "APPLICATION_STARTING", "APPLICATION_STOPPING"}
@@ -215,15 +228,27 @@ def cmd_public(api: Api, args: argparse.Namespace) -> None:
         return
     if want and not args.yes:
         if not sys.stdin.isatty():
-            sys.exit("Refusing to open an app to unauthenticated access without confirmation: pass --yes, or run from a terminal.")
-        if input(f"Anyone with the URL will reach it without login. Type the subdomain {app['subdomain']!r} to confirm: ").strip() != app["subdomain"]:
+            sys.exit(
+                "Refusing to open an app to unauthenticated access without confirmation: pass --yes, or run from a terminal."
+            )
+        if (
+            input(
+                f"Anyone with the URL will reach it without login. Type the subdomain {app['subdomain']!r} to confirm: "
+            ).strip()
+            != app["subdomain"]
+        ):
             sys.exit("Subdomain did not match; nothing changed.")
     api.call("PATCH", f"{api.apps_path}/{app['id']}", {"bypass_authentication": want})
     # A PATCH can silently ignore a false/zero value, so read it back instead of trusting the 200.
     got = bool(api.call("GET", f"{api.apps_path}/{app['id']}").get("bypass_authentication"))
     if got != want:
-        sys.exit(f"{app['subdomain']}: PATCH returned OK but bypass_authentication is still {got}. Change it in the CAI UI.")
-    print(f"{app['subdomain']}: unauthenticated access {'on' if got else 'off'}" + ("" if args.restart else "; restart the app if it does not take effect"))
+        sys.exit(
+            f"{app['subdomain']}: PATCH returned OK but bypass_authentication is still {got}. Change it in the CAI UI."
+        )
+    print(
+        f"{app['subdomain']}: unauthenticated access {'on' if got else 'off'}"
+        + ("" if args.restart else "; restart the app if it does not take effect")
+    )
     if args.restart:
         restart(api, app)
 
@@ -405,9 +430,13 @@ def main() -> None:
     s.add_argument("--dry-run", action="store_true")
     s.add_argument("--start", action="store_true", help="leave them running (default: stop right after creation)")
     s.set_defaults(fn=cmd_create)
-    s = sub.add_parser("backup", help="write apps and env as create payloads to a JSON file (mode 600, secrets in clear)")
+    s = sub.add_parser(
+        "backup", help="write apps and env as create payloads to a JSON file (mode 600, secrets in clear)"
+    )
     s.add_argument("apps", nargs="*", help="subdomains or names (default: all)")
-    s.add_argument("-o", "--output", help="file to write (default: cai-apps-backup-<timestamp>.json; never overwritten)")
+    s.add_argument(
+        "-o", "--output", help="file to write (default: cai-apps-backup-<timestamp>.json; never overwritten)"
+    )
     s.set_defaults(fn=cmd_backup)
     s = sub.add_parser("restore", help="recreate apps from a backup file (existing subdomains are skipped)")
     s.add_argument("file")

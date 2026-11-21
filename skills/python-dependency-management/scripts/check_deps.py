@@ -81,9 +81,7 @@ def check_versions(label, doc, unversioned, errors):
                 continue
             specs = list(req.specifier)
             if len(specs) != 1 or specs[0].operator != ">=":
-                errors.append(
-                    f"{label} {section}: {raw!r} must use a single '>=<tested version>' bound"
-                )
+                errors.append(f"{label} {section}: {raw!r} must use a single '>=<tested version>' bound")
 
 
 def project_deps(label, doc, errors):
@@ -120,9 +118,7 @@ def main():
     workspace = root_doc.get("tool", {}).get("uv", {}).get("workspace")
     members = [(path, load(path / "pyproject.toml")) for path in member_dirs(root, workspace or {})]
 
-    member_names = {
-        canonicalize_name(doc["project"]["name"]) for _, doc in members if "name" in doc.get("project", {})
-    }
+    member_names = {canonicalize_name(doc["project"]["name"]) for _, doc in members if "name" in doc.get("project", {})}
     if "name" in root_doc.get("project", {}):
         member_names.add(canonicalize_name(root_doc["project"]["name"]))
 
@@ -143,7 +139,9 @@ def main():
                 if name in unversioned:
                     continue
                 if name not in root_deps:
-                    errors.append(f"{path.relative_to(root)}: {req.name} is not declared in the root [project] dependencies")
+                    errors.append(
+                        f"{path.relative_to(root)}: {req.name} is not declared in the root [project] dependencies"
+                    )
                 elif req.specifier != root_deps[name].specifier:
                     errors.append(
                         f"{path.relative_to(root)}: {req.name}{req.specifier} differs from root "

@@ -69,8 +69,12 @@ def main() -> None:
     p.add_argument("app", help="subdomain or name in the manifest")
     p.add_argument("--manifest")
     p.add_argument("--root", default=".", help="project root the manifest's script paths are relative to")
-    p.add_argument("--env", action="append", default=[], metavar="KEY=VALUE|KEY=@file", help="extra or overriding env var")
-    p.add_argument("--port-var", choices=sorted(PORT_VARS), default="APP", help="which session port to bind (default APP)")
+    p.add_argument(
+        "--env", action="append", default=[], metavar="KEY=VALUE|KEY=@file", help="extra or overriding env var"
+    )
+    p.add_argument(
+        "--port-var", choices=sorted(PORT_VARS), default="APP", help="which session port to bind (default APP)"
+    )
     p.add_argument("--timeout", type=int, default=60, help="seconds to wait for the health path to answer")
     p.add_argument("--keep", action="store_true", help="keep running after a good probe until Ctrl-C")
     args = p.parse_args()
@@ -95,12 +99,16 @@ def main() -> None:
     if not script.is_file():
         sys.exit(f"Script not found: {script}")
     if "__file__" in script.read_text(errors="replace"):
-        print("warning: the script mentions __file__. A deployed app runs through a Jupyter kernel where it is "
-              "undefined, so this may work here and fail there (see references/launchers.md).")
+        print(
+            "warning: the script mentions __file__. A deployed app runs through a Jupyter kernel where it is "
+            "undefined, so this may work here and fail there (see references/launchers.md)."
+        )
 
     if port_in_use(port):
-        sys.exit(f"FAIL: something is already listening on 127.0.0.1:{port} (a previous run or another app in this "
-                 f"session). Stop it first, or pick another port with --port-var.")
+        sys.exit(
+            f"FAIL: something is already listening on 127.0.0.1:{port} (a previous run or another app in this "
+            f"session). Stop it first, or pick another port with --port-var."
+        )
 
     print(f"{spec['subdomain']}: running {spec['script']} on {port_name}={port}, health {health}")
     proc = subprocess.Popen([sys.executable, str(script)], cwd=root, env=env)

@@ -65,9 +65,7 @@ def load_config(root: Path) -> tuple[dict[str, object], str]:
 
 def ruleset_xml(cfg: dict[str, object]) -> str:
     def rule(name: str, **props: int) -> str:
-        body = "".join(
-            f'      <property name="{k}" value="{v}"/>\n' for k, v in props.items()
-        )
+        body = "".join(f'      <property name="{k}" value="{v}"/>\n' for k, v in props.items())
         return (
             f'  <rule ref="category/java/design.xml/{name}">\n'
             f"    <properties>\n{body}    </properties>\n  </rule>\n"
@@ -91,17 +89,27 @@ def ruleset_xml(cfg: dict[str, object]) -> str:
 
 def run_python(root: Path, cfg: dict[str, object], paths: list[str]) -> int:
     cmd = [
-        sys.executable, "-m", "lizard", "-l", "python", "-w", "-Ecognitive",
-        "-C", str(cfg["max_ccn"]),
-        "-a", str(cfg["max_params"]),
-        "-T", f"nloc={cfg['max_nloc']}",
-        "-T", f"cognitive_complexity={cfg['max_cognitive']}",
+        sys.executable,
+        "-m",
+        "lizard",
+        "-l",
+        "python",
+        "-w",
+        "-Ecognitive",
+        "-C",
+        str(cfg["max_ccn"]),
+        "-a",
+        str(cfg["max_params"]),
+        "-T",
+        f"nloc={cfg['max_nloc']}",
+        "-T",
+        f"cognitive_complexity={cfg['max_cognitive']}",
     ]
     for pattern in cfg["exclude"]:
         cmd += ["-x", pattern]
     cmd += paths or ["."]
     print("+", " ".join(cmd), flush=True)
-    return subprocess.run(cmd, cwd=root).returncode
+    return subprocess.run(cmd, cwd=root, check=False).returncode
 
 
 def run_java(root: Path, cfg: dict[str, object], paths: list[str]) -> int:
@@ -118,7 +126,7 @@ def run_java(root: Path, cfg: dict[str, object], paths: list[str]) -> int:
         cmd += ["--exclude", pattern]
     print("+", " ".join(cmd), flush=True)
     try:
-        return subprocess.run(cmd, cwd=root).returncode
+        return subprocess.run(cmd, cwd=root, check=False).returncode
     finally:
         ruleset.unlink(missing_ok=True)
 

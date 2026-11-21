@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-A compendium of agent skills written in-house for future development work. The repo is distributed two ways, and every change must keep both working:
+A compendium of agent skills written in-house for future development work. The repo is distributed three ways, and every change must keep all of them working:
 
 1. **Claude Code plugin marketplace**: `/plugin marketplace add ramottamado/skills`, then `/plugin install skills@ramottamado`. The marketplace is `ramottamado` and the plugin is `skills`. The license is MIT.
-2. **`npx skills`**: `npx skills add https://github.com/ramottamado/skills`
+2. **Antigravity plugin**: `agy plugin install https://github.com/ramottamado/skills` (the [Antigravity CLI](https://antigravity.google/docs/plugins/)). Its manifest is `.antigravity-plugin/plugin.json`, and it reads the same `skills/` directory as the other two.
+3. **`npx skills`**: `npx skills add https://github.com/ramottamado/skills`
 
 The layout follows [cloudflare/skills](https://github.com/cloudflare/skills). Use that repo as the reference when deciding where something goes.
 
-There is no build, lint, or test tooling. The development environment is `.devcontainer/`, a Python 3.13 uv image (user `vscode`) with Node LTS, Claude Code, and the Dev Container CLI (`devcontainer`) installed. When you add tooling, document its commands here.
+There is no build step or test suite. The checks are the two manifest validators and the Python linters under "Validating changes". The development environment is `.devcontainer/`, a Python 3.13 uv image (user `vscode`) with Node LTS, Claude Code, and the Dev Container CLI (`devcontainer`) installed. It also mounts the host's `~/.gemini` and installs the Antigravity VS Code extension. The `agy` CLI is at `~/.gemini/bin/agy` (under that mount) and is not on PATH. When you add tooling, document its commands here.
 
 Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv run --script <path>`. For example, `uv run --script skills/devcontainer/scripts/check_devcontainer.py .` checks this repo's own `.devcontainer/devcontainer.json`. Inside the container, `devcontainer read-configuration --workspace-folder .` confirms the file parses, but `devcontainer up` needs Podman on the host.
 
@@ -39,9 +40,9 @@ CONTRIBUTING.md
 ```
 
 Key points:
-- **The repo root is the plugin.** `marketplace.json` points at `./`, and Claude Code discovers skills automatically from `skills/*/SKILL.md`. Nothing has to register each skill. `npx skills` reads the same `skills/` directory, which is why one tree serves both install paths.
-- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release. `agy plugin validate .` checks the Antigravity manifest (`agy` is not on PATH in the devcontainer: run `~/.gemini/bin/agy plugin validate .`); The logo is `assets/icon.png` (512 px PNG), referenced by `icon` in the Claude manifest and `logo` in the Antigravity one.
-- Manifests for other agents are optional additions; cloudflare/skills ships one each for `.codex-plugin/`, `.cursor-plugin/`, `.agents/plugins/`, and `.antigravity-plugin/`. If you add any, they mirror the same metadata.
+- **The repo root is the plugin.** `marketplace.json` points at `./`, and Claude Code discovers skills automatically from `skills/*/SKILL.md`. Nothing has to register each skill. Antigravity and `npx skills` read the same `skills/` directory, which is why one tree serves all three install paths.
+- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release. `agy plugin validate .` checks the Antigravity manifest (see "Validating changes" for how to run it); The logo is `assets/icon.png` (512 px PNG), referenced by `icon` in the Claude manifest and `logo` in the Antigravity one.
+- The Claude Code and Antigravity manifests are the two this repo ships. Manifests for other agents are optional additions; cloudflare/skills also ships `.codex-plugin/`, `.cursor-plugin/` and `.agents/plugins/`. If you add any, they mirror the same metadata.
 
 ## Skill authoring conventions
 
@@ -58,4 +59,13 @@ Key points:
 ## Validating changes
 
 - `claude plugin validate .` checks the marketplace and plugin manifests. It currently passes with one warning that you can ignore: it says this CLAUDE.md isn't loaded as plugin context, which is intended because it's for working on the repo. 
+- `~/.gemini/bin/agy plugin validate .` checks the Antigravity manifest (`agy` is not on PATH in the devcontainer). It should print `Validation passed`; run it with `claude plugin validate .` on every release, since both `plugin.json` files carry the version.
+- **Python helper scripts** are linted and formatted with `uvx`, so nothing is installed in the repo and no config file is needed. Run both from the repo root; each must come back clean:
+
+  ```
+  uvx ruff check --line-length 120 skills/*/scripts/*.py
+  uvx black --check --line-length 120 skills/*/scripts/*.py
+  ```
+
+  Use `uvx black --line-length 120 <file>` to reformat. A script with a shebang must be executable (`chmod +x`), or ruff reports EXE001. Keep the 120-column limit in the command; don't add a `pyproject.toml` or `ruff.toml` for it.
 - To test locally, run `/plugin marketplace add ./` from the repo root, install the plugin, and confirm that the skill triggers on a representative prompt.
