@@ -1,7 +1,7 @@
 {
   "name": "skills",
   "description": "A compendium of agent skills by ramottamado for day-to-day development.",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "icon": "assets/icon.png",
   "author": {
     "name": "ramottamado",

@@ -28,13 +28,15 @@ An app is addressed by subdomain or name. Variable names ending `_KEY`, `_TOKEN`
 
 The manifest (non-secret app definitions) format is in [references/apps.example.json](references/apps.example.json): `runtime_match` (substring of the runtime image id; the newest enabled match is used) and `apps[]` with `name`, `subdomain`, `script`, `cpu`, `memory`, `description`, `env`. `${VAR}` and `${VAR:-default}` in `env` values are filled from the local environment; `create` aborts and lists any unset variable without a default.
 
+To try a launcher in the current session before creating the Application (three session ports, health probe, browser URL), use [scripts/test_app.py](scripts/test_app.py) and read [references/session-testing.md](references/session-testing.md).
+
 For writing the app scripts themselves (port binding, Python, Node.js, Java and bash launchers, no `__file__` because runtimes are Jupyter-based, health checks, Kerberos refresh, app-to-app calls) read [references/launchers.md](references/launchers.md).
 
 ## Workflow
 
 1. **Inspect:** `list` and `env <app>` show what is deployed, who it runs as, and its config. Read the project's launcher scripts and manifest before changing anything.
 2. **Retrieve docs:** the API reference is the OpenAPI document at `https://$CDSW_DOMAIN/api/v2/swagger.json`. Check it rather than trusting memory.
-3. **Apply:** follow "First deployment" or "Common operations" below. Use `--dry-run` first.
+3. **Apply:** follow "First deployment" or "Common operations" below. Use `--dry-run` first. For a new app, run `test_app.py` first.
 4. **Validate:** `list` for status, then the checks in "Verifying a deployment".
 5. **Report:** which apps changed, which variables were set or removed (names only, never values), what was restarted, and any step you could not run.
 
