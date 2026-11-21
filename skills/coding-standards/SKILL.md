@@ -56,6 +56,8 @@ A shared floor of conventions. The project's own rules always win over this skil
 
 When reviewing, check in this order: correctness and error paths, naming and clarity, duplication, hidden mutation, missing tests, then style the formatter would catch. Report style-only findings last and only if the project has no formatter.
 
+If the agent harness has its own skill or command for a correctness review or a simplification pass (for example `/code-review` or `/simplify` in Claude Code), run it for those parts and apply this skill's conventions on top. Without one, this checklist covers the whole review.
+
 ## Skill feedback
 
 If the user reports that this skill gave incorrect or outdated guidance, or is missing information, read [references/skill-feedback.md](references/skill-feedback.md).

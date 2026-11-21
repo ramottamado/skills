@@ -11,8 +11,8 @@ Thumbs.db
 *.swp
 *~
 
-# Claude Code per-user settings
-.claude/settings.local.json
+# Claude Code local settings and notes (per user, never committed)
+.claude/
 CLAUDE.local.md
 
 # Node tooling
@@ -22,10 +22,11 @@ npm-debug.log*
 # Secrets
 .env
 .env.*
+# cai-apps backups hold every app's environment, secrets included, in clear text
+cai-apps-backup-*.json
 
-# Python
+# Python (helper scripts and lint runs; the repo has no Python project of its own)
 __pycache__/
 *.py[cod]
-
-# Claude Code local settings
-.claude/
+.venv/
+.ruff_cache/

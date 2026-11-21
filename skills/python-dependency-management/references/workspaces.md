@@ -34,7 +34,7 @@ acme-core = { workspace = true }
 
 1. If the root doesn't declare it yet, add it there first: `uv add <pkg>`. This writes `<pkg>>=<resolved version>`.
 2. Add it to the member with the root's exact specifier: `uv add --package <member> '<pkg>>=<root floor>'`.
-3. Run the tests (see [Validate](#validate)). The floor is now the tested version.
+3. Run the tests (see "Validate" below). The floor is now the tested version.
 
 ### Remove a dependency from a member
 

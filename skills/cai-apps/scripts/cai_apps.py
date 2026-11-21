@@ -132,21 +132,30 @@ class Api:
                 return json.loads(res.read() or b"{}")
         except urllib.error.HTTPError as exc:
             sys.exit(f"{method} {path} failed: HTTP {exc.code} {exc.read().decode()[:300]}")
+        except urllib.error.URLError as exc:
+            hint = ""
+            if "CERTIFICATE" in str(exc.reason).upper():
+                hint = " The workbench uses a private CA: point SSL_CERT_FILE at a bundle that contains it."
+            sys.exit(f"{method} {path} failed: {exc.reason}.{hint}")
 
     @property
     def apps_path(self) -> str:
         return f"/projects/{self.project}/applications"
 
-    def apps(self) -> list[dict]:
-        apps: list[dict] = []
+    def paged(self, path: str, key: str, page_size: int = 100) -> list[dict]:
+        """GET every page of a list endpoint, following `next_page_token`."""
+        items: list[dict] = []
         token = ""
         while True:
-            query = "?page_size=100" + (f"&page_token={urllib.parse.quote(token)}" if token else "")
-            page = self.call("GET", self.apps_path + query)
-            apps += page.get("applications", [])
+            query = f"?page_size={page_size}" + (f"&page_token={urllib.parse.quote(token)}" if token else "")
+            page = self.call("GET", path + query)
+            items += page.get(key, [])
             token = page.get("next_page_token", "")
             if not token:
-                return apps
+                return items
+
+    def apps(self) -> list[dict]:
+        return self.paged(self.apps_path, "applications")
 
     def wait(self, app_id: str, timeout: int = 300, grace: int = 10) -> str:
         """Poll until the app leaves STARTING/STOPPING. The status can still show the old state right after a
@@ -253,14 +262,18 @@ def cmd_public(api: Api, args: argparse.Namespace) -> None:
         restart(api, app)
 
 
+def runtime_key(image_id: str) -> tuple:
+    """Sort key for a runtime image id: the numbers in its tag compared as numbers, so `-b12` is newer than `-b9`."""
+    tag = image_id.rpartition(":")[2]
+    return tuple(int(n) for n in re.findall(r"\d+", tag)), image_id
+
+
 def resolve_runtime(api: Api, match: str) -> str:
-    runtimes = api.call("GET", "/runtimes?page_size=200").get("runtimes", [])
-    ids = sorted(
-        r["image_identifier"] for r in runtimes if match in r["image_identifier"] and r.get("status") == "ENABLED"
-    )
+    runtimes = api.paged("/runtimes", "runtimes", page_size=200)
+    ids = [r["image_identifier"] for r in runtimes if match in r["image_identifier"] and r.get("status") == "ENABLED"]
     if not ids:
         sys.exit(f"No enabled runtime matches {match!r}")
-    return ids[-1]
+    return max(ids, key=runtime_key)
 
 
 def manifest_path(arg: str | None) -> Path:

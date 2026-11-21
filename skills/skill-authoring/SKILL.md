@@ -1,6 +1,6 @@
 ---
 name: skill-authoring
-description: Create, edit, or review a skill in the ramottamado/skills repository (a repo with skills/<name>/SKILL.md and a .claude-plugin/marketplace.json). Use when the user asks to add a new skill, rewrite a skill's description or triggers, split a skill into references, or check a skill against the repo's conventions. Not for skills in other repositories or for personal skills under ~/.claude/skills.
+description: Create, edit, or review a skill in the ramottamado/skills repository (a repo with a skills folder of SKILL.md files and a .claude-plugin/marketplace.json). Use when the user asks to add a new skill, rewrite a skill's description or triggers, split a skill into references, or check a skill against the repo's conventions. Not for skills in other repositories or for personal skills under ~/.claude/skills.
 ---
 
 # Skill authoring
@@ -17,6 +17,7 @@ Use this skill to add or change skills in this repository so they install cleanl
 - Create `skills/<name>/SKILL.md`. Use a kebab-case `name`, and make it match the directory name.
 - The frontmatter holds only `name` and `description`.
 - Write the `description` as the trigger. Say what the skill does and when to use it, with concrete signals such as file names, tools, or user phrasing. Say when not to use it, and name the sibling skill that covers that case.
+- Keep the `description` under 1,024 characters (the Agent Skills limit; the validators don't check it) and free of tag-like text such as `<name>`, which some skill uploads reject. Leave implementation detail to the body.
 - Keep the body short and procedural: inspect the project, retrieve the relevant docs, apply the change, validate, and report what changed.
 - Move long or rarely needed detail into `skills/<name>/references/*.md`. Link each file from `SKILL.md` with a relative path, and say when to read it.
 - Link to a local file by its path only, never with a `#anchor`. To point at a section, name it in the text, as in `see "Add" in [commands.md](commands.md)`. Agents and some editors read the anchor as part of the filename, and the link breaks.

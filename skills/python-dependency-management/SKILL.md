@@ -1,18 +1,18 @@
 ---
 name: python-dependency-management
-description: Add, remove, upgrade, sync, or install Python dependencies, and fix dependency problems, in Python >=3.13 projects and multi-project workspaces managed by uv, including dependency groups ([dependency-groups], dev dependencies) and optional extras. Enforces ">=<tested version>" specifiers and keeps workspace members' dependencies a subset of the root's. Use when a pyproject.toml or uv.lock is present and the user asks to add, install, remove, upgrade, or pin a package, mentions pip install, requirements.txt, a dev dependency, a dependency group, a workspace member ([tool.uv.workspace]), or an out-of-date lockfile, or hits a ModuleNotFoundError or resolver conflict. Not for installing Python versions or CLI tools (uv python, uv tool), building or publishing packages, or non-Python dependencies; this repo has no sibling skill for those yet.
+description: Add, remove, upgrade, sync, or install Python dependencies, and fix dependency problems, in Python >=3.12 projects and multi-project workspaces managed by uv, including dependency groups ([dependency-groups], dev dependencies) and optional extras. Enforces a single ">=" floor at the tested version and keeps workspace members' dependencies a subset of the root's. Use when a pyproject.toml or uv.lock is present and the user asks to add, install, remove, upgrade, or pin a package, mentions pip install, requirements.txt, a dev dependency, a dependency group, a workspace member ([tool.uv.workspace]), or an out-of-date lockfile, or hits a ModuleNotFoundError or resolver conflict. Not for installing Python versions or CLI tools (uv python, uv tool), building or publishing packages, or non-Python dependencies; this repo has no sibling skill for those yet.
 ---
 
 # Python dependency management
 
 Use this skill to change or repair a Python project's dependencies with uv. uv manages all Python dependencies: `pyproject.toml` declares them, `uv.lock` pins them, and `.venv` is synced from the lockfile.
 
-This skill supports Python >=3.13. Its bundled script requires Python 3.13 or later, and its guidance assumes projects that declare `requires-python = ">=3.13"` or a narrower range.
+This skill supports Python >=3.12. Its bundled script requires Python 3.12 or later, and its guidance assumes projects that declare `requires-python = ">=3.12"` or a narrower range, such as `">=3.13"`.
 
 ## Inspect the project
 
 - Read `pyproject.toml`: `[project] dependencies`, `requires-python`, `[project.optional-dependencies]`, `[dependency-groups]`, and `[tool.uv]` (workspace members, `sources`, `index`, `default-groups`, `conflicts`).
-- Check that `requires-python` stays within `>=3.13`. If the project allows older Pythons, tell the user it is outside this skill's supported range, and don't raise `requires-python` without their agreement.
+- Check that `requires-python` stays within `>=3.12`. If the project allows older Pythons, tell the user it is outside this skill's supported range, and don't raise `requires-python` without their agreement.
 - Check for `uv.lock` and `.python-version`, and whether the project is a workspace (`[tool.uv.workspace]` in the root) or a member of one. For workspaces, read [references/workspaces.md](references/workspaces.md) before changing anything.
 - Run `uv --version`. Flags change between releases, so confirm any flag you are unsure of with `uv <command> --help`.
 - A standalone script with an inline `# /// script` block (PEP 723) takes `uv add --script <file>`, not project commands.

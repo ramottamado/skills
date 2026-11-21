@@ -1,6 +1,6 @@
 # /// script
-# requires-python = ">=3.13"
-# dependencies = ["lizard>=1.17"]
+# requires-python = ">=3.12"
+# dependencies = ["lizard>=1.26.1"]
 # ///
 """Run PMD (Java) and Lizard (Python) against one shared set of thresholds.
 
@@ -20,9 +20,12 @@ it fails. PMD reports at ">= level", so the script passes max + 1 to PMD.
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
@@ -117,18 +120,46 @@ def run_java(root: Path, cfg: dict[str, object], paths: list[str]) -> int:
     if not pmd:
         print("error: pmd is not on PATH; see references/pmd.md for install options", file=sys.stderr)
         return 2
-    ruleset = root / ".pmd-ruleset.generated.xml"
-    ruleset.write_text(ruleset_xml(cfg))
-    cmd = [pmd, "check", "-R", str(ruleset), "-f", "text", "--no-cache"]
-    for p in paths or ["."]:
-        cmd += ["-d", p]
-    for pattern in cfg["exclude"]:
-        cmd += ["--exclude", pattern]
-    print("+", " ".join(cmd), flush=True)
+    # Temp files live outside the project, so an interrupted run leaves nothing in the user's tree.
+    temps: list[Path] = []
     try:
+        temps.append(write_temp("pmd-ruleset-", ".xml", ruleset_xml(cfg)))
+        cmd = [pmd, "check", "-R", str(temps[0]), "-f", "text", "--no-cache"]
+        if cfg["exclude"]:
+            # PMD's --exclude takes exact paths, matched against the path form PMD discovered (it depends on how
+            # -d was written), not globs. Pass the files left after excluding as an explicit list instead.
+            files, skipped = java_files(root, paths or ["."], cfg["exclude"])
+            print(f"# {len(files)} Java file(s), {skipped} excluded by {cfg['exclude']}", flush=True)
+            if not files:
+                return 0
+            temps.append(write_temp("pmd-files-", ".txt", "".join(f"{f}\n" for f in files)))
+            cmd += ["--file-list", str(temps[1])]
+        else:
+            for p in paths or ["."]:
+                cmd += ["-d", p]
+        print("+", " ".join(cmd), flush=True)
         return subprocess.run(cmd, cwd=root, check=False).returncode
     finally:
-        ruleset.unlink(missing_ok=True)
+        for temp in temps:
+            temp.unlink(missing_ok=True)
+
+
+def write_temp(prefix: str, suffix: str, text: str) -> Path:
+    with tempfile.NamedTemporaryFile("w", prefix=prefix, suffix=suffix, delete=False) as f:
+        f.write(text)
+    return Path(f.name)
+
+
+def java_files(root: Path, paths: list[str], patterns: list[str]) -> tuple[list[str], int]:
+    """The .java files under `paths` (relative to root) that no exclude pattern matches, and how many were skipped.
+    A pattern is matched like Lizard's -x: fnmatch against "./<path relative to root>", where `*` also crosses `/`."""
+    found: set[str] = set()
+    for p in paths:
+        target = root / p
+        candidates = [target] if target.is_file() else target.rglob("*.java")
+        found.update(f"./{Path(os.path.relpath(c, root)).as_posix()}" for c in candidates if c.suffix == ".java")
+    kept = sorted(f for f in found if not any(fnmatch.fnmatch(f, pattern) for pattern in patterns))
+    return kept, len(found) - len(kept)
 
 
 def main() -> int:

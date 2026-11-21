@@ -20,11 +20,15 @@ Every `max_*` value is the largest value still allowed. A function at the limit 
 | `max_nloc` | 60 | `NcssCount` `methodReportLevel` = max + 1 | `-T nloc=max` |
 | `max_params` | 5 | `ExcessiveParameterList` `minimum` = max + 1 | `-a max` |
 | `max_npath` | 200 | `NPathComplexity` `reportLevel` = max + 1 | not available |
-| `exclude` | none | `--exclude` | `-x` |
+| `exclude` | none | matched by the script, remaining files passed with `--file-list` | `-x` |
 
 ## Why max + 1 for PMD
 
 PMD's rules report a method when its metric is `>=` the level (checked against the rule sources: `cyclo >= methodReportLevel`, `cognitive >= reportLevel`, `npath >= reportLevel`, `methodSize >= level`, and the parameter-count rule's `minimum`). Lizard warns when the metric is above the limit. The script adds 1 on the PMD side so both tools agree on what "allowed" means.
+
+## How `exclude` reaches PMD
+
+PMD's `--exclude` takes exact file paths, matched against the path form PMD itself discovered, not glob patterns. So the script matches each pattern the way Lizard's `-x` does (fnmatch against `./<path relative to the root>`, where `*` also crosses `/`) and gives PMD the remaining `.java` files with `--file-list`. With plain PMD in CI, list the excluded files explicitly or use the build plugin's own excludes.
 
 ## Known differences between the tools
 

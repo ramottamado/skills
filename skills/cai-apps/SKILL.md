@@ -9,7 +9,7 @@ A CAI Application is a long-running process the platform runs from a script in t
 
 ## Tooling
 
-[scripts/cai_apps.py](scripts/cai_apps.py) is a standard-library wrapper over the API. Run it from a CAI session in the project (the session already has `CDSW_DOMAIN`, `CDSW_PROJECT_ID`, `CDSW_APIV2_KEY`). Copy it into the project (for example `scripts/cai_apps.py`) if it should be versioned with the code, or call it by its path here.
+[scripts/cai_apps.py](scripts/cai_apps.py) is a standard-library wrapper over the API. Run it from a CAI session in the project (the session already has `CDSW_DOMAIN`, `CDSW_PROJECT_ID`, `CDSW_APIV2_KEY`). Copy it into the project (for example `scripts/cai_apps.py`) if it should be versioned with the code, or call it by its path here. `test_app.py` imports `cai_apps.py`, so copy the two scripts into the same folder together.
 
 ```bash
 uv run --script cai_apps.py list                                  # status, run-as, health path

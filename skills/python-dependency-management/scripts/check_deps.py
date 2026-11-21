@@ -1,6 +1,6 @@
 # /// script
-# requires-python = ">=3.13"
-# dependencies = ["packaging>=24.0"]
+# requires-python = ">=3.12"
+# dependencies = ["packaging>=26.3"]
 # ///
 """Check a uv project or workspace against the python-dependency-management skill's rules.
 

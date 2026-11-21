@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.12"
 # dependencies = []
 # ///
 """Check a VS Code devcontainer.json against the devcontainer skill's rules.
