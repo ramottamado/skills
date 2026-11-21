@@ -59,7 +59,7 @@ Key points:
 ## Validating changes
 
 - `claude plugin validate .` checks the marketplace and plugin manifests. It currently passes with one warning that you can ignore: it says this CLAUDE.md isn't loaded as plugin context, which is intended because it's for working on the repo. 
-- `~/.gemini/bin/agy plugin validate .` checks the Antigravity manifest (`agy` is not on PATH in the devcontainer). It should print `Validation passed`; run it with `claude plugin validate .` on every release, since both `plugin.json` files carry the version.
+- `agy plugin validate .` checks the Antigravity manifest. In this devcontainer `agy` is not on PATH, so check `command -v agy` first, then `~/.gemini/bin/agy`, then `find ~/.gemini -name agy -type f` (the location can differ between workspaces). It should print `Validation passed`; run it with `claude plugin validate .` on every release, since both `plugin.json` files carry the version.
 - **Python helper scripts** are linted and formatted with `uvx`, so nothing is installed in the repo and no config file is needed. Run both from the repo root; each must come back clean:
 
   ```

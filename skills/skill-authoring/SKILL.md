@@ -5,7 +5,7 @@ description: Create, edit, or review a skill in the ramottamado/skills repositor
 
 # Skill authoring
 
-Use this skill to add or change skills in this repository so they install cleanly through both the Claude Code plugin marketplace and `npx skills`.
+Use this skill to add or change skills in this repository so they install cleanly through the Claude Code plugin marketplace, the Antigravity plugin (`agy`), and `npx skills`.
 
 ## Inspect the repository
 
@@ -32,7 +32,8 @@ Use this skill to add or change skills in this repository so they install cleanl
 ## Validate
 
 - Run `claude plugin validate .` from the repository root.
-- Run `agy plugin validate .` (the missing-logo warning under `--strict` is expected).
+- Run `agy plugin validate .`. Find `agy` first (`command -v agy`); if it is not on `PATH`, look for it in `~/.gemini/bin/agy` (where this repo's devcontainer keeps it), then search the Antigravity data folder (`find ~/.gemini -name agy -type f`), since the location can differ between workspaces, before concluding it is not installed, and say so in your report if you cannot run it. It should pass, including with `--strict`.
+- If the skill ships Python scripts under `skills/<name>/scripts/`, lint and format them from the repository root, and fix what they report: `uvx ruff check --line-length 120 skills/*/scripts/*.py` and `uvx black --check --line-length 120 skills/*/scripts/*.py`. Give any script that has a shebang the executable bit (`chmod +x`). Run each script's `--help` or a representative case in a scratch directory, not in the repo tree.
 - Install the plugin locally with `/plugin marketplace add ./` and `/plugin install skills@ramottamado`. Confirm that the skill triggers on a representative prompt and stays quiet on a near miss.
 - Report the files that changed and any validation you could not run.
 
