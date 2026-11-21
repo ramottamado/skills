@@ -28,7 +28,7 @@ Per the [Cloudera AI documentation](https://docs.cloudera.com/machine-learning/1
 A passing test does not prove the deployment works. Check these separately:
 
 - **Kernel:** a deployed app's launcher runs through a Jupyter kernel; the test runs it as `python script.py`. `__file__` works in the test and not when deployed, so the script warns when the launcher mentions it.
-- **Identity:** the test runs as you, with your Kerberos ticket and injected API keys. A deployed app runs as its run-as account, or as whoever started it, so keytab permissions and tokens can differ.
+- **Identity:** the test runs as you, with your Kerberos ticket and injected API keys. A deployed app runs as its run-as account, or as whoever started it, so the Kerberos principal and tokens can differ.
 - **Port and URL:** the session's port differs from the one an Application gets, and the browser URL is the session's, not `<subdomain>.$CDSW_DOMAIN`. Relative-URL and path-prefix problems can show up only when deployed.
 - **Environment:** the test sees the manifest's env and your `--env`, not the deployed app's live environment or secrets.
 

@@ -115,7 +115,7 @@ Never hard-code it in the launcher or commit it. Keep the CA and truststore in t
 
 CAI starts an app with a ticket for the run-as user, but it lasts about 15 minutes and has a renewal limit. For a long-running app that talks to a Kerberized service (Impala, HDFS, Hive):
 
-- Keep the keytab in a gitignored folder (e.g. `keytabs/`), readable by the run-as account.
+- Keep the keytab in a gitignored folder (e.g. `keytabs/`). The run-as account can read it: CAI only allows run-as for a machine user with Operator access to the project.
 - In the launcher, run `kinit -kt <keytab> <principal>` at start and then every ~hour from a daemon thread, into a **dedicated credential cache** (`KRB5CCNAME=FILE:/tmp/<app>_krb5cc_<uid>`), so it never clobbers the ticket CAI injected. Pass `KRB5CCNAME` to the child.
 - **Java programs** are configured through JVM options rather than just the ticket cache. Keep `krb5.conf` and a JAAS file in the project and pass them as JVM options in `cmd`, before `-jar`:
 
