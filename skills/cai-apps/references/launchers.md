@@ -12,11 +12,12 @@ A CAI Application runs one script. Each app is its own pod with the **project fi
 - **Serve relative URLs only.** CAI serves each app under a path prefix, so a UI must call `api/ask`, not `/api/ask`.
 - **Health endpoint = liveness only.** CAI restarts apps whose polling endpoint fails. Never make `/health` touch a database, warehouse, Kerberos or another app, or an upstream outage becomes a restart loop. Put dependency checks on a different path and set `CDSW_APP_POLLING_ENDPOINT` to the liveness one.
 - **Find the interpreter before writing the launcher** (`uv`, `java`, `npx`/`node`, `bash`). If it is not on `PATH` or in the project, ask the user rather than assuming a location.
+- **Set an env var in the launcher only if its value must be generated at start or taken from another variable the CAI runtime sets.** Examples: the program's own port variable, filled from `CDSW_APP_PORT`; a path built at start (such as a database file under the project root); a `PATH` prepend (it extends the existing value, where an app-environment `PATH` would replace it); a per-process value like a Kerberos cache path containing the user id. Every other value (host, CA paths, feature flags, the program's fixed settings, secrets) goes in the CAI Application's environment, through the manifest's `env` or `cai_apps.py set <app> KEY=value` (see SKILL.md), so a config change needs only `set --restart` and no launcher edit. The launcher inherits the app environment.
 - **Fail fast on missing required env** with a message naming the variable; it lands in the app log.
 
 ## Launcher script
 
-Keep the launcher thin: set the environment, then run the real program as a child process. The child is an ordinary process, so `__file__`, `sys.argv` and the working directory behave normally there. Only the marked block changes per app (see "Per language" below):
+Keep the launcher thin: add only the env vars it must generate (see the rule above), then run the real program as a child process. The child is an ordinary process, so `__file__`, `sys.argv` and the working directory behave normally there. Only the marked block changes per app (see "Per language" below):
 
 ```python
 import os, subprocess, sys
@@ -25,10 +26,10 @@ from pathlib import Path
 port = os.environ.get("CDSW_APP_PORT") or sys.exit("CDSW_APP_PORT is not set: run this as a Cloudera AI Application.")
 root = Path(os.environ.get("PROJECT_ROOT", "/home/cdsw"))  # fixed path, never __file__
 
-# --- edit only this block: working directory, command, environment (and host/port, see below) ---
+# --- edit only this block: working directory, command, and env vars the launcher must generate ---
 cwd = root
 cmd = ["my-program"]
-env = {**os.environ}                                      # host/port: see "How the program takes host and port"
+env = {**os.environ}                                      # add only generated or CAI-derived values here, e.g. "<PORT_VAR>": port
 # ---------------------------------------------------------------------
 
 sys.exit(subprocess.run(cmd, cwd=cwd, env=env).returncode)
@@ -58,10 +59,9 @@ cmd = ["npx", "my-node-app"]                          # or ["node", "server.js"]
 cmd = [f"{root}/jdk/bin/java", "-jar", f"{root}/app.jar"]
 ```
 
-**Bash script**: the launcher itself stays Python (the kernel runs Python), so call the script as the child. Invoke it through `bash` rather than relying on the executable bit, and pass the root (and host/port) as env vars.
+**Bash script**: the launcher itself stays Python (the kernel runs Python), so call the script as the child. Invoke it through `bash` rather than relying on the executable bit, and set `PROJECT_ROOT` and the program's fixed settings in the app environment.
 
 ```python
-env = {**os.environ, "PROJECT_ROOT": str(root)}
 cmd = ["bash", f"{root}/scripts/start.sh"]
 ```
 
@@ -73,17 +73,17 @@ For a Kerberized app, see "Kerberos from a keytab" below.
 
 The option names belong to the program, not to this skill, so never copy them from memory or from another program. Find them in this order: the program's own docs and `--help` (search the web for its configuration reference if the project doesn't include it), then the project's existing config, then ask the user. Then use whichever mechanism the program supports:
 
-| It takes host/port from | In the edit block |
+| It takes host/port from | Where it goes |
 |---|---|
-| Environment variables | Add them to `env`: `{**os.environ, "<HOST_VAR>": "127.0.0.1", "<PORT_VAR>": port}`. For a bash script, pass them the same way and use them in its `exec` line. |
-| CLI flags | Append them to `cmd`: `[..., "<host-flag>", "127.0.0.1", "<port-flag>", port]`. For Java, JVM `-D` properties go before `-jar`. |
+| Environment variables | Host (fixed `127.0.0.1`): the app environment, `<HOST_VAR>=127.0.0.1`. Port: the launcher, `env = {**os.environ, "<PORT_VAR>": port}`, because its value comes from `CDSW_APP_PORT`. For a bash script, use the variables in its `exec` line. |
+| CLI flags | `cmd` (arguments cannot come from the app environment); append them: `[..., "<host-flag>", "127.0.0.1", "<port-flag>", port]`. For Java, JVM `-D` properties go before `-jar`. |
 | Nothing (hard-coded port or `0.0.0.0`) | Look for an undocumented env var or config key first; otherwise start it from a small entry script that calls its API with `host="127.0.0.1", port=...`. Don't put a reverse proxy in front of it. |
 
 Always take the port from `CDSW_APP_PORT`. It is often `8100`, but read it from the environment rather than hard-coding the number, since the platform decides it.
 
 ## Trusting an internal CA
 
-If the program calls HTTPS services signed by a private CA (the platform's own proxy, an internal API, an LLM gateway), it fails with certificate errors unless it trusts that CA. Ask the user where the CA certificate (PEM) is; don't guess. Keep it in the project, and set the runtime's own option in the launcher's `env` or `cmd`:
+If the program calls HTTPS services signed by a private CA (the platform's own proxy, an internal API, an LLM gateway), it fails with certificate errors unless it trusts that CA. Ask the user where the CA certificate (PEM) is; don't guess. Keep it in the project, and set the runtime's own option. The env-var ones are fixed values, so they go in the app environment (`set <app> NODE_EXTRA_CA_CERTS=/home/cdsw/ca.pem`); the Java options go in `cmd`:
 
 | Runtime | Setting | Notes |
 |---|---|---|
