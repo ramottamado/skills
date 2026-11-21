@@ -40,7 +40,7 @@ CONTRIBUTING.md
 
 Key points:
 - **The repo root is the plugin.** `marketplace.json` points at `./`, and Claude Code discovers skills automatically from `skills/*/SKILL.md`. Nothing has to register each skill. `npx skills` reads the same `skills/` directory, which is why one tree serves both install paths.
-- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release. `agy plugin validate .` checks the Antigravity manifest; The logo is `assets/icon.png` (512 px PNG), referenced by `icon` in the Claude manifest and `logo` in the Antigravity one.
+- **The plugin metadata appears in three places:** `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, and `.antigravity-plugin/plugin.json`. Keep name, description, and version in sync, and bump the version in both `plugin.json` files on release. `agy plugin validate .` checks the Antigravity manifest (`agy` is not on PATH in the devcontainer: run `~/.gemini/bin/agy plugin validate .`); The logo is `assets/icon.png` (512 px PNG), referenced by `icon` in the Claude manifest and `logo` in the Antigravity one.
 - Manifests for other agents are optional additions; cloudflare/skills ships one each for `.codex-plugin/`, `.cursor-plugin/`, `.agents/plugins/`, and `.antigravity-plugin/`. If you add any, they mirror the same metadata.
 
 ## Skill authoring conventions
