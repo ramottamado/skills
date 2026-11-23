@@ -39,7 +39,7 @@ Copy any folder under `skills/` into your agent's skills directory. For example,
 | --- | --- |
 | [`skill-authoring`](skills/skill-authoring/SKILL.md) | Create, edit, or review a skill in this repository |
 | [`python-dependency-management`](skills/python-dependency-management/SKILL.md) | Add, remove, update, sync, and troubleshoot Python (>=3.12) dependencies, dependency groups, and workspace members with uv |
-| [`devcontainer`](skills/devcontainer/SKILL.md) | Create or update a VS Code Dev Containers `devcontainer.json` running on Podman for Python, Java, or mixed Python and Java projects |
+| [`devcontainer`](skills/devcontainer/SKILL.md) | Create or update a VS Code Dev Containers `devcontainer.json` running on Podman for Python, Java, mixed Python and Java, or other projects |
 | [`static-analysis`](skills/static-analysis/SKILL.md) | Run static analysis with shared complexity thresholds: PMD for Java and Lizard for Python |
 | [`cai-apps`](skills/cai-apps/SKILL.md) | Deploy and operate Cloudera AI Applications: create from a manifest, set env vars and secrets, restart, verify, troubleshoot, write launchers |
 | [`coding-standards`](skills/coding-standards/SKILL.md) | Apply baseline naming, readability, error-handling, and testing conventions in Python, Java, and TypeScript |

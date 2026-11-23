@@ -14,7 +14,7 @@ The layout follows [cloudflare/skills](https://github.com/cloudflare/skills). Us
 
 There is no build step or test suite. The checks are the two manifest validators and the Python linters under "Validating changes". The development environment is `.devcontainer/`, a Python 3.13 uv image (user `vscode`) with Node LTS, Claude Code, and the Dev Container CLI (`devcontainer`) installed. It also mounts the host's `~/.gemini` and installs the Antigravity VS Code extension. The `agy` CLI is at `~/.gemini/bin/agy` (under that mount) and is not on PATH. When you add tooling, document its commands here.
 
-Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv run --script <path>`. For example, `uv run --script skills/devcontainer/scripts/check_devcontainer.py .` checks this repo's own `.devcontainer/devcontainer.json`. Inside the container, `devcontainer read-configuration --workspace-folder .` confirms the file parses, but `devcontainer up` needs Podman on the host.
+Helper scripts in `skills/*/scripts/` carry PEP 723 metadata. Run them with `uv run --script <path>`. For example, `uv run --script skills/devcontainer/scripts/check_devcontainer.py .` checks this repo's own `.devcontainer/devcontainer.json`. Inside the container, `devcontainer read-configuration` needs a stub engine (see "Validating changes"), and `devcontainer up` needs Podman on the host.
 
 ## Scope and testing rules
 
@@ -68,4 +68,13 @@ Key points:
   ```
 
   Use `uvx black --line-length 120 <file>` to reformat. A script with a shebang must be executable (`chmod +x`), or ruff reports EXE001. Keep the 120-column limit in the command; don't add a `pyproject.toml` or `ruff.toml` for it.
+- **Dev Container CLI parse**: the container has no Podman or Docker, and `devcontainer read-configuration` fails with `spawn docker ENOENT` because it runs `<engine> ps`. Don't mount the host's Podman socket for this. Point `--docker-path` at a stub engine in a scratch directory instead:
+
+  ```
+  S=$(mktemp -d) && printf '#!/bin/sh\nexit 0\n' > "$S/podman" && chmod +x "$S/podman"
+  devcontainer read-configuration --workspace-folder <project-root> --docker-path "$S/podman"
+  rm -rf "$S"
+  ```
+
+  This shows how the CLI resolves the config, but its parser is lenient: it exits 0 on malformed JSON (a truncated file, or two strings without a comma). The strict check is the skill's own `check_devcontainer.py`. To prove a container starts, run `devcontainer up --docker-path podman` on the host, against a scratch project.
 - To test locally, run `/plugin marketplace add ./` from the repo root, install the plugin, and confirm that the skill triggers on a representative prompt.

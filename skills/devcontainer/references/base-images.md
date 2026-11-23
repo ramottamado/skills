@@ -1,6 +1,6 @@
 # Supported base images and features
 
-These are the only base images and features the skill generates. Extend this file, not `SKILL.md`, when you support another stack. Keep [scripts/check_devcontainer.py](../scripts/check_devcontainer.py) (`JAVA_IMAGE`, `UV_IMAGE`, `REQUIRED_FEATURES`, `DISALLOWED_FEATURES`) in sync with it, and keep the script's env, mount, extension, and setting constants in sync with [devcontainer-json.md](devcontainer-json.md).
+These are the only base images and features the skill generates. Extend this file, not `SKILL.md`, when you support another stack. Keep [scripts/check_devcontainer.py](../scripts/check_devcontainer.py) (`JAVA_IMAGE`, `UV_IMAGE`, `BASE_IMAGE`, `REQUIRED_FEATURES`, `DISALLOWED_FEATURES`) in sync with it, and keep the script's env, mount, extension, and setting constants in sync with [devcontainer-json.md](devcontainer-json.md).
 
 ## Image by stack
 
@@ -9,6 +9,7 @@ These are the only base images and features the skill generates. Extend this fil
 | Python | `ghcr.io/astral-sh/uv:<uv-version>-python<python-version>-trixie-slim` | None |
 | Python and Java | `ghcr.io/astral-sh/uv:<uv-version>-python<python-version>-trixie-slim` | java |
 | Java | `mcr.microsoft.com/devcontainers/java:<java-version>-trixie` | java |
+| Neither (shell scripts, Containerfiles, config, and so on) | `mcr.microsoft.com/devcontainers/base:trixie` | None |
 
 Whenever Python is enabled, use the uv image, even if the project doesn't use uv yet. Don't use an MCR Python image, and don't write a Containerfile: the image is used as-is, and the uv settings go in `containerEnv` (see "Python settings" in [devcontainer-json.md](devcontainer-json.md)).
 
@@ -16,7 +17,9 @@ Whenever Python is enabled, use the uv image, even if the project doesn't use uv
 
 `containerUser` and `remoteUser` are always `vscode`. Declare both even when the image already defines the user.
 
-The common-utils feature with `"username": "vscode"` is always added. It creates the `vscode` user and its home directory `/home/vscode`, owned by `vscode`. The uv image has no `vscode` user, so common-utils is what creates it there. On the MCR Java image, the user already exists and common-utils keeps it.
+The common-utils feature with `"username": "vscode"`, `"userUid": "1000"`, and `"userGid": "1000"` is always added. It creates the `vscode` user with UID and GID 1000 and its home directory `/home/vscode`, owned by `vscode`. The uv image has no `vscode` user, so common-utils is what creates it there. On the MCR Java and base images, `vscode` already exists with UID 1000, and common-utils keeps it.
+
+Pinning UID 1000 matters because the image must not have another user with that UID. On Linux, VS Code Dev Containers changes the remote user's UID to the host user's UID (usually 1000) so bind-mounted files such as `~/.claude` and `~/.config/gh` belong to `vscode`. It skips that step when another user in the image already has the host UID. On an image whose UID 1000 user isn't `vscode` (for example `node` in `mcr.microsoft.com/devcontainers/javascript-node`), common-utils gives `vscode` another UID, the remap is skipped, and under rootless Podman `vscode` can't use the bind mounts. With `"userUid": "1000"` set, common-utils fails at build time on such an image instead of failing quietly at run time. The fix is to switch to a supported image, such as `mcr.microsoft.com/devcontainers/base:trixie`. Check the feature's current option names in the [common-utils README](https://github.com/devcontainers/features/tree/main/src/common-utils).
 
 Ownership under `/home/vscode`:
 
@@ -27,7 +30,7 @@ Ownership under `/home/vscode`:
 
 | Feature | When | Options |
 | --- | --- | --- |
-| `ghcr.io/devcontainers/features/common-utils:2` | Always (creates the `vscode` user) | `"username": "vscode"`, `"installZsh": true`, `"upgradePackages": true` |
+| `ghcr.io/devcontainers/features/common-utils:2` | Always (creates the `vscode` user) | `"username": "vscode"`, `"userUid": "1000"`, `"userGid": "1000"`, `"installZsh": true`, `"upgradePackages": true` |
 | `ghcr.io/devcontainers/features/git:1` | Always | `"version": "os-provided"` |
 | `ghcr.io/devcontainers/features/node:2` | Always (claude-code depends on it) | `"version": "lts"` |
 | `ghcr.io/anthropics/devcontainer-features/claude-code:1.0` | Always | None |
@@ -41,8 +44,9 @@ Always set `"overrideFeatureInstallOrder"` to every feature ID in the config, wi
 
 - Python: use the project's `.python-version`, or the lowest version that `requires-python` allows. Fall back to the newest stable Python that the uv image publishes.
 - uv: the reference tag is `0.13.3-python3.14-trixie-slim`. Use the newest uv release that has a `-python<python-version>-trixie-slim` tag.
+- Base: use the `trixie` tag of the MCR base image.
 - Java: use `.java-version`, `maven.compiler.release`, or the Gradle toolchain version. Fall back to the newest LTS. For a Java-only project, confirm that the `<java-version>-trixie` tag exists for the MCR Java image.
-- Confirm image tags against the published tag lists before writing them: [uv images](https://docs.astral.sh/uv/guides/integration/docker/#available-images) and the [MCR Java image](https://github.com/devcontainers/images/tree/main/src/java).
+- Confirm image tags against the published tag lists before writing them: [uv images](https://docs.astral.sh/uv/guides/integration/docker/#available-images), the [MCR Java image](https://github.com/devcontainers/images/tree/main/src/java), and the [MCR base image](https://github.com/devcontainers/images/tree/main/src/base-debian).
 
 ## Java build tools
 
@@ -59,4 +63,4 @@ These assume a Docker daemon, or a build step this skill doesn't use, and break 
 - `dockerComposeFile` based configurations
 - `build` / Containerfile or Dockerfile based configurations
 
-Any other image is outside the supported list. If an existing file already uses one, or uses `build`, keep it, apply the naming, user, and feature rules, and ask the user before switching it to a supported image.
+Any other image is outside the supported list. If an existing file already uses one, or uses `build`, keep it, apply the naming, user, and feature rules, and ask the user before switching it to a supported image. The checker reports a kept image or `build` as a `note:`, not an `error:`, so the file can still pass. If the kept image already has a UID 1000 user other than `vscode`, recommend `mcr.microsoft.com/devcontainers/base:trixie` (see "The vscode user" above).

@@ -1,9 +1,9 @@
 {
-	"name": "skills",
+	"name": "skills-devcontainer",
 	"image": "ghcr.io/astral-sh/uv:0.13.6-python3.13-trixie-slim",
 	"runArgs": [
 		"--name",
-		"skills",
+		"skills-devcontainer",
 		"--tmpfs=/tmp:rw,exec,nosuid,nodev,mode=1777",
 		"--secret=gh_token,type=env,target=GH_TOKEN"
 	],
@@ -19,6 +19,8 @@
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000",
 			"installZsh": true,
 			"upgradePackages": true
 		},
@@ -52,7 +54,7 @@
 		"source=${localEnv:HOME}/.gemini,target=/home/vscode/.gemini,type=bind,consistency=cached",
 		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
 		"source=uv-vol,target=/home/vscode/.uv,type=volume,chown=true",
-		"source=skills-venv,target=/home/vscode/.venv,type=volume,chown=true"
+		"source=skills-devcontainer-venv,target=/home/vscode/.venv,type=volume,chown=true"
 	],
 	"customizations": {
 		"vscode": {

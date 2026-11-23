@@ -1,8 +1,8 @@
 # devcontainer.json templates
 
-Replace `<name>` with the normalized project name and the version placeholders with the versions chosen from [base-images.md](base-images.md). The `name` value, the value after `--name`, and the `<name>-venv` volume all use the same string.
+Replace `<name>` with the normalized project name plus `-devcontainer` (see "Derive the name" in [SKILL.md](../SKILL.md)), and replace the version placeholders with the versions chosen from [base-images.md](base-images.md). The `name` value, the value after `--name`, and the `<name>-venv` volume all use the same string.
 
-Every template carries the settings in "Shared settings" below. Python-enabled configs add "Python settings", and Java-enabled configs add "Java settings". The skill writes only `devcontainer.json`: there is no Containerfile.
+Every template carries the settings in "Shared settings" below. Python-enabled configs add "Python settings", and Java-enabled configs add "Java settings". A project that is neither Python nor Java uses the "Base" template, which has only the shared settings. The skill writes only `devcontainer.json`: there is no Containerfile.
 
 The Python and mixed templates include the optional `postCreateCommand` and the optional Python `extensions` and `settings`. Drop them when "Python settings" says to. The Java and mixed templates also include the optional Java `extensions`; drop them when "Java settings" says to.
 
@@ -32,6 +32,8 @@ Every template sets `overrideFeatureInstallOrder`: common-utils, node, and claud
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000",
 			"installZsh": true,
 			"upgradePackages": true
 		},
@@ -105,6 +107,8 @@ Leave out `installMaven` / `installGradle` when a wrapper (`mvnw`, `gradlew`) is
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000",
 			"installZsh": true,
 			"upgradePackages": true
 		},
@@ -179,6 +183,8 @@ The Python template plus the java feature, which installs last through `override
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000",
 			"installZsh": true,
 			"upgradePackages": true
 		},
@@ -239,6 +245,60 @@ The Python template plus the java feature, which installs last through `override
 }
 ```
 
+## Base
+
+For a project that is neither Python nor Java (for example shell scripts, Containerfiles, or config files). It has only the shared settings: no language features, volumes, `postCreateCommand`, or extensions.
+
+```jsonc
+{
+	"name": "<name>",
+	"image": "mcr.microsoft.com/devcontainers/base:trixie",
+	"runArgs": [
+		"--name",
+		"<name>",
+		"--tmpfs=/tmp:rw,exec,nosuid,nodev,mode=1777",
+		"--secret=gh_token,type=env,target=GH_TOKEN"
+	],
+	"containerEnv": {
+		"CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+	},
+	"containerUser": "vscode",
+	"remoteUser": "vscode",
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000",
+			"installZsh": true,
+			"upgradePackages": true
+		},
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "os-provided"
+		},
+		"ghcr.io/devcontainers/features/node:2": {
+			"version": "lts"
+		},
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"installDirectlyFromGitHubRelease": true
+		},
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache:latest": {}
+	},
+	"overrideFeatureInstallOrder": [
+		"ghcr.io/devcontainers/features/common-utils",
+		"ghcr.io/devcontainers/features/node",
+		"ghcr.io/anthropics/devcontainer-features/claude-code",
+		"ghcr.io/devcontainers/features/git",
+		"ghcr.io/devcontainers/features/github-cli",
+		"ghcr.io/ramottamado/devcontainer-features/vscode-extensions-cache"
+	],
+	"mounts": [
+		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached"
+	]
+}
+```
+
 ## Shared settings
 
 Every config gets these, whatever the stack:
@@ -250,7 +310,7 @@ Every config gets these, whatever the stack:
 | `containerEnv` | `"CLAUDE_CONFIG_DIR": "/home/vscode/.claude"` | Points Claude Code at the mounted config |
 | `mounts` | `${localEnv:HOME}/.claude` → `/home/vscode/.claude` (bind) | Shares the host's Claude Code config and sign-in |
 | `mounts` | `${localEnv:HOME}/.config/gh` → `/home/vscode/.config/gh` (bind) | Shares the host's GitHub CLI config |
-| common-utils feature | `"username": "vscode"`, `"installZsh": true`, `"upgradePackages": true` | Creates `vscode` and its home `/home/vscode`, installs zsh, and upgrades OS packages |
+| common-utils feature | `"username": "vscode"`, `"userUid": "1000"`, `"userGid": "1000"`, `"installZsh": true`, `"upgradePackages": true` | Creates `vscode` with UID and GID 1000 and its home `/home/vscode`, installs zsh, and upgrades OS packages (see "The vscode user" in [base-images.md](base-images.md)) |
 
 ## Python settings
 
@@ -307,7 +367,8 @@ Tell the user about these in the report, because the container fails to start wi
 
 ## Updating an existing file
 
-- If the file uses `build` with a Containerfile or Dockerfile, ask before replacing it with `image`. Move any `ENV` values that the user wants to keep into `containerEnv`.
+- If the file uses `build` with a Containerfile or Dockerfile, or an image outside the supported list, keep it and ask before replacing it. The checker reports either one as a `note:`, not an `error:`. If the kept image already has a UID 1000 user other than `vscode` (for example `node` in `mcr.microsoft.com/devcontainers/javascript-node`), recommend switching to `mcr.microsoft.com/devcontainers/base:trixie` (see "The vscode user" in [base-images.md](base-images.md)).
+- When you replace `build` with `image`, move any `ENV` values that the user wants to keep into `containerEnv`.
 - Keep other `runArgs` entries, and make sure exactly one `--name` pair, one `/tmp` tmpfs, and one `gh_token` secret are present.
 - Add the required extensions and settings to any existing `customizations.vscode` without removing the user's own.
 - If a `postCreateCommand` already exists and you are adding the uv sync, chain it (`<existing> && uv sync --locked --all-groups`) rather than replacing the command.

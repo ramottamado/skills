@@ -4,14 +4,17 @@
 # ///
 """Check a VS Code devcontainer.json against the devcontainer skill's rules.
 
-1. "name" is set and is a valid Podman container name.
+1. "name" is set, is a valid Podman container name, and ends with "-devcontainer".
 2. "runArgs" contains "--name <name>" (or "--name=<name>") exactly once, matching "name",
    plus the /tmp tmpfs and gh_token secret arguments.
 3. "containerUser" and "remoteUser" are both declared as "vscode".
-4. The image is the MCR Java trixie image (with the java feature) or the uv trixie-slim
-   image; no "build" section.
+4. The image is the MCR Java trixie image (with the java feature), the uv trixie-slim
+   image, or the MCR base trixie image. Any other image, or a "build" section, gets a
+   note rather than an error, because the skill keeps an existing one until the user
+   agrees to switch.
 5. The common-utils, git, node, claude-code, github-cli, and vscode-extensions-cache
-   features are present with their required options.
+   features are present with their required options (common-utils pins vscode to
+   UID and GID 1000).
 6. CLAUDE_CONFIG_DIR and the ~/.claude and ~/.config/gh bind mounts are present. Named
    volumes use chown=true, and bind mounts don't.
 7. Python (uv image): the uv containerEnv values and the uv-vol and <name>-venv volumes.
@@ -37,12 +40,19 @@ FIRST_FEATURES = (
     "ghcr.io/devcontainers/features/node",
     "ghcr.io/anthropics/devcontainer-features/claude-code",
 )
+BASE_IMAGE = re.compile(r"mcr\.microsoft\.com/devcontainers/base:(?:[^:]+-)?trixie")
 UV_IMAGE = re.compile(r"ghcr\.io/astral-sh/uv:[^:]+-python[^:]+-trixie-slim")
 USER = "vscode"
 JAVA_FEATURE = "ghcr.io/devcontainers/features/java"
 # Feature ID prefix -> option values every config must set.
 REQUIRED_FEATURES = {
-    "ghcr.io/devcontainers/features/common-utils": {"username": USER, "installZsh": True, "upgradePackages": True},
+    "ghcr.io/devcontainers/features/common-utils": {
+        "username": USER,
+        "userUid": "1000",
+        "userGid": "1000",
+        "installZsh": True,
+        "upgradePackages": True,
+    },
     "ghcr.io/devcontainers/features/git": {"version": "os-provided"},
     "ghcr.io/devcontainers/features/node": {"version": "lts"},
     "ghcr.io/anthropics/devcontainer-features/claude-code": {},
@@ -75,6 +85,7 @@ DISALLOWED_FEATURES = (
     "ghcr.io/devcontainers/features/docker-outside-of-docker",
 )
 CONTAINER_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*")
+NAME_SUFFIX = "-devcontainer"
 
 
 def find_config(target):
@@ -167,6 +178,33 @@ def check_install_order(config, java, errors):
             errors.append(f'{base} is not in "overrideFeatureInstallOrder"')
 
 
+def option_value(value):
+    """Feature options are strings in the spec, but accept a bare integer such as 1000."""
+    return str(value) if isinstance(value, int) and not isinstance(value, bool) else value
+
+
+def check_image(config, java, errors, notes):
+    image = config.get("image") or ""
+    if "dockerComposeFile" in config:
+        errors.append('"dockerComposeFile" is not supported; this skill covers image-based Podman configs')
+    if "build" in config:
+        notes.append(
+            '"build" is outside the supported list; it was kept, so ask the user before replacing it with "image"'
+            " (see references/base-images.md)"
+        )
+    elif not image:
+        errors.append('no "image" set')
+    elif JAVA_IMAGE.fullmatch(image):
+        if not java:
+            errors.append(f"{JAVA_FEATURE} is missing; add it whenever Java is enabled")
+    elif not (UV_IMAGE.fullmatch(image) or BASE_IMAGE.fullmatch(image)):
+        notes.append(
+            f'"image" {image!r} is outside the supported list; it was kept, so ask the user before switching it.'
+            " If the image already has a UID 1000 user other than vscode, common-utils fails to create vscode"
+            " with userUid 1000; switch to mcr.microsoft.com/devcontainers/base:trixie (see references/base-images.md)"
+        )
+
+
 def main():
     path = find_config(Path(sys.argv[1] if len(sys.argv) > 1 else "."))
     try:
@@ -174,13 +212,15 @@ def main():
     except json.JSONDecodeError as exc:
         sys.exit(f"{path}: cannot parse: {exc}")
 
-    errors = []
+    errors, notes = [], []
 
     name = config.get("name")
     if not name:
-        errors.append('"name" is missing; set it to the project name')
+        errors.append(f'"name" is missing; set it to the project name plus {NAME_SUFFIX!r}')
     elif not CONTAINER_NAME.fullmatch(name):
         errors.append(f'"name" {name!r} is not a valid container name ([a-zA-Z0-9][a-zA-Z0-9_.-]*)')
+    elif not name.endswith(NAME_SUFFIX):
+        errors.append(f'"name" {name!r} must end with {NAME_SUFFIX!r}; use {name + NAME_SUFFIX!r}')
 
     names = run_arg_names(config.get("runArgs", []))
     if not names:
@@ -203,19 +243,8 @@ def main():
             errors.append(f'"{key}" is {config[key]!r}; set it to {USER!r}')
 
     java = find_feature(config, JAVA_FEATURE) is not None
-    image = config.get("image") or ""
-    python = bool(UV_IMAGE.fullmatch(image))
-    if "dockerComposeFile" in config:
-        errors.append('"dockerComposeFile" is not supported; this skill covers image-based Podman configs')
-    if "build" in config:
-        errors.append('"build" is not supported; use "image" and put Containerfile ENV values in "containerEnv"')
-    if not image:
-        errors.append('no "image" set')
-    elif JAVA_IMAGE.fullmatch(image):
-        if not java:
-            errors.append(f"{JAVA_FEATURE} is missing; add it whenever Java is enabled")
-    elif not python:
-        errors.append(f'"image" {image!r} is not a supported base image (see references/base-images.md)')
+    python = bool(UV_IMAGE.fullmatch(config.get("image") or ""))
+    check_image(config, java, errors, notes)
 
     for prefix, options in REQUIRED_FEATURES.items():
         value = find_feature(config, prefix)
@@ -223,7 +252,7 @@ def main():
             errors.append(f"{prefix} is missing; every config needs it")
             continue
         for key, expected in options.items():
-            if value.get(key) != expected:
+            if option_value(value.get(key)) != expected:
                 errors.append(f"{prefix} {key} is {value.get(key)!r}; set it to {expected!r}")
 
     check_mounts(config, REQUIRED_MOUNTS, errors)
@@ -246,6 +275,8 @@ def main():
 
     for error in errors:
         print(f"error: {error}")
+    for note in notes:
+        print(f"note: {note}")
     if errors:
         sys.exit(1)
     sources = [
